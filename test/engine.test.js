@@ -354,4 +354,40 @@ test('Bay Corridors: only shorten distances, never below 3 miles, stay symmetric
   checkBooks(sim);
 });
 
+test('Retire-to-Mentor: mentors keep their seat, are never double-counted, and retire on schedule', () => {
+  const sim = make({ mentorSharePct: 60, mentorQuarters: 3, companies: 100 });
+  const A = sim.agents, E = sim.events;
+  while (!sim.done) {
+    sim.step();
+    checkBooks(sim);
+    sim.mentors.forEach((a) => {
+      assert.strictEqual(A.status[a], S.EMPLOYED, `mentor ${a} not employed`);
+      assert(A.mentorUntilQ[a] > 0);
+    });
+    sim.companies.forEach((c) => assert.strictEqual(c.mentorCount, c.members.filter((a) => A.mentorUntilQ[a]).length, `${c.name} mentor count`));
+  }
+  const became = new Map(), retired = new Map(), left = new Set();
+  for (let i = 0; i < E.n; i++) {
+    const a = E.agent[i], t = E.type[i];
+    if (t === W.EV.MENTOR) { assert(!became.has(a), `agent ${a} became a mentor twice`); became.set(a, E.q[i]); }
+    if (t === W.EV.RETIRE) { assert(!retired.has(a), `agent ${a} retired twice`); retired.set(a, E.q[i]); }
+    if (became.has(a) && !retired.has(a) && (t === W.EV.LEAVE || t === W.EV.LAYOFF || t === W.EV.PROMOTE)) left.add(a);
+  }
+  assert(became.size > 500, 'too few mentors');
+  assert.strictEqual(left.size, 0, 'a mentor quit, was laid off or promoted');
+  became.forEach((q, a) => {
+    if (q + 3 < sim.q) assert.strictEqual(retired.get(a), q + 3, `mentor ${a} retired at ${retired.get(a)}, expected ${q + 3}`);
+    else assert(!retired.has(a), 'retired early');
+  });
+  const s = sim.series, retiredSum = s.reduce((t, x) => t + x.retired, 0);
+  assert.strictEqual(retiredSum, s.at(-1).retiredTotal, 'retirements counted once, when they happen');
+});
+
+test('Retire-to-Mentor: with the attrition cut at 0, grad quits are unchanged within noise', () => {
+  const get = (m) => m.gradFirstYearQuit;
+  const off = smallMean({ years: 3 }, get), structural = smallMean({ years: 3, mentorSharePct: 50, mentorAttritionCut: 0 }, get), assumed = smallMean({ years: 3, mentorSharePct: 50 }, get);
+  assert(Math.abs(structural - off) < 0.01, `structural ${structural} vs off ${off}`);
+  assert(assumed < off - 0.02, 'the assumed cut lowers grad quits');
+});
+
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

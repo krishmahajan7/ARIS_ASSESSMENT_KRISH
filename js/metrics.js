@@ -152,6 +152,17 @@
       mentorsActive: last.mentorsActive || 0,
       mentorRetirements: sumKey(s, 'mentorRetired'),
       handoffs: sumKey(s, 'handoffs'),
+      mentorsStarted: sumKey(s, 'mentorsNew'),
+      // First-year quit rate of grad hires (quits within 4 quarters of the hire ÷ grad hires; a flow
+      // ratio, so the last year's hires have had less time to quit).
+      gradFirstYearQuit: (function () {
+        var h = sumKey(s, 'gradHiresMentored') + sumKey(s, 'gradHiresUnmentored');
+        return h ? (sumKey(s, 'gradEarlyQuitsMentored') + sumKey(s, 'gradEarlyQuitsUnmentored')) / h : null;
+      })(),
+      gradFirstYearQuitMentored: sumKey(s, 'gradHiresMentored') ? sumKey(s, 'gradEarlyQuitsMentored') / sumKey(s, 'gradHiresMentored') : null,
+      gradFirstYearQuitUnmentored: sumKey(s, 'gradHiresUnmentored') ? sumKey(s, 'gradEarlyQuitsUnmentored') / sumKey(s, 'gradHiresUnmentored') : null,
+      gradHiresMentored: sumKey(s, 'gradHiresMentored'),
+      backfillReqs: last.backfillReqs,
       unfilledReqs: last.openReqs,
       oldReqs: last.oldReqs,
       avgFillQuarters: hires ? fillAgeSum / hires : null,
@@ -190,6 +201,9 @@
     ['commute', 'Avg commute', function (m) { return m.avgCommute; }, 'mi', false],
     ['gap', 'City unemployment gap p90−p10', function (m) { return m.cityGapP90P10; }, 'pct', false],
     ['retired', 'Retirements', function (m) { return m.retirements; }, 'num', null],
+    ['retPlusMentor', 'Retired + still mentoring at end', function (m) { return m.retirements + m.mentorsActive; }, 'num', null],
+    ['gradQuit', 'Grad hires: first-year quit rate', function (m) { return m.gradFirstYearQuit; }, 'pct', false],
+    ['backfill', 'Open backfill reqs at end', function (m) { return m.backfillReqs; }, 'num', false],
     ['hires', 'Total hires', function (m) { return m.hires; }, 'num', true],
   ];
 

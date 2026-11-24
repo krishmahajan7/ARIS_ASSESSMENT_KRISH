@@ -82,6 +82,9 @@
     handoffCountsTowardCap: 1, // 1 = handoff hires use the receiving company's hiring cap (the brief's rule)
     handoffRadiusMiles: 25,  // receiving HQ within this many miles of the old HQ
     handoffSharePct: 100,    // share of each company's laid-off people offered the handoff
+    mentorSharePct: 0,       // share of employed retirees who phase out as mentors first (0 = off)
+    mentorQuarters: 4,       // how long a mentor stays before retiring for real
+    mentorAttritionCut: 30,  // ASSUMPTION: cut in first-year quit rate for grads hired where a mentor works
     // Stress tests (Policy Lab). The multipliers are ASSUMPTIONS, not estimates.
     shock: 0,                // 0 none · 1 recession (layoffs ×2, growth frozen) · 2 boom (growth ×2, cap ×1.5)
     shockStartQ: 4,          // first shocked quarter (0-based)
@@ -110,8 +113,8 @@
 
   var S = { EMPLOYED: 0, GRAD: 1, SWITCHER: 2, LAID_OFF: 3, RETIRED: 4, EXITED: 5 };
   var STATUS_NAMES = ['Employed', 'New grad (pool)', 'Switching jobs (pool)', 'Laid off (pool)', 'Retired', 'Left Bay Area'];
-  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7, REDEPLOY: 8 };
-  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area', 'Redeployed (warm handoff)'];
+  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7, REDEPLOY: 8, MENTOR: 9 };
+  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area', 'Redeployed (warm handoff)', 'Became a mentor (phased retirement)'];
 
   var FIRST = ['Aarav', 'Maya', 'Wei', 'Sofia', 'Diego', 'Priya', 'Ethan', 'Mei', 'Omar', 'Hana', 'Lucas', 'Ananya',
     'Noah', 'Yuki', 'Mateo', 'Leila', 'Jin', 'Grace', 'Ravi', 'Chloe', 'Kofi', 'Isabel', 'Arjun', 'Nadia', 'Samuel',
@@ -206,6 +209,9 @@
     cfg.handoffCountsTowardCap = cfg.handoffCountsTowardCap ? 1 : 0;
     cfg.handoffRadiusMiles = Math.max(1, cfg.handoffRadiusMiles);
     cfg.handoffSharePct = Math.max(0, Math.min(100, cfg.handoffSharePct));
+    cfg.mentorSharePct = Math.max(0, Math.min(100, cfg.mentorSharePct));
+    cfg.mentorQuarters = Math.max(1, Math.min(12, Math.round(cfg.mentorQuarters)));
+    cfg.mentorAttritionCut = Math.max(0, Math.min(90, cfg.mentorAttritionCut));
     cfg.shock = Math.max(0, Math.min(2, Math.round(cfg.shock)));
     cfg.shockStartQ = Math.max(0, Math.round(cfg.shockStartQ));
     cfg.shockQuarters = Math.max(1, Math.round(cfg.shockQuarters));
@@ -225,6 +231,10 @@
     // hiring logic. last*Q stores quarter + 1 (0 = never).
     screened: Uint16Array, screenedSpell: Uint16Array, lastScreenedQ: Int16Array,
     offeredSpell: Uint16Array, lastOfferedQ: Int16Array,
+    // Retire-to-Mentor: quarter + 1 when a mentor retires for real (0 = not a
+    // mentor); quarter + 1 until which a grad's quit rate is cut (0 = none);
+    // quarter + 1 of a hire straight from the new-grad pool (0 = not a grad hire).
+    mentorUntilQ: Int16Array, mentoredUntilQ: Int16Array, gradHireQ: Int16Array,
   };
 
   function Agents(capacity) {
@@ -305,6 +315,7 @@
     this.events.sim = this;
     this.pool = [];
     this.active = [];
+    this.mentors = []; // Retire-to-Mentor: agents phasing out
     this.series = [];
 
     // Commute miles between every pair of cities.
@@ -355,7 +366,7 @@
         synthetic: u.synthetic, payTier: u.payTier, mult: mult,
         city: cityIndex[u.city], cityName: u.city, engineersData: u.engineers,
         members: [], levelCount: [0, 0, 0, 0, 0, 0, 0], reqs: [], target: 0, startHc: 0,
-        frozen: false, capQ: 0, hiredQ: 0, fillAgeSum: 0,
+        frozen: false, capQ: 0, hiredQ: 0, fillAgeSum: 0, mentorCount: 0,
         series: { hc: [], hires: [], leavers: [], layoffs: [], retired: [], promos: [], planned: [], cap: [], unfilled: [],
           payroll: [], hireSpend: [], avgComp: [], avgBand: [], commute: [], levels: [] },
         totals: { hires: 0, leavers: 0, layoffs: 0, retired: 0, promos: 0, hireSpend: 0 },
@@ -507,6 +518,7 @@
       hireSpend: 0, hireComp: 0, hireCommute: 0, fillAge: 0,
       bySource: [0, 0, 0, 0], pairs: {},
       handoffs: 0, handoffPairs: {}, laidOffSameQ: 0,
+      mentorsNew: 0, mentorRetired: 0, gradHires: [0, 0], gradEarlyQuits: [0, 0],
     };
     this.companies.forEach(function (c) {
       c.qc = { hires: 0, leavers: 0, layoffs: 0, retired: 0, promos: 0, hireSpend: 0 };
@@ -530,10 +542,14 @@
     // 3. Voluntary attrition.
     var pLarge = 1 - Math.pow(0.5, 1 / (4 * cfg.halfLifeLarge));
     var pStart = 1 - Math.pow(0.5, 1 / (4 * cfg.halfLifeStartup));
+    var cut = 1 - cfg.mentorAttritionCut / 100, q = this.q;
     this.companies.forEach(function (c) {
       var p = c.kind === 'large' ? pLarge : pStart;
       for (var i = c.members.length - 1; i >= 0; i--) {
-        if (self.rand() < p) self.quit(c.members[i]);
+        var m = c.members[i];
+        // Retire-to-Mentor: mentors don't quit; recently hired grads at a company
+        // with a mentor quit less (ASSUMPTION). Both flags are 0 when the feature is off.
+        if (self.rand() < (A.mentoredUntilQ[m] > q ? p * cut : p) && !A.mentorUntilQ[m]) self.quit(m);
       }
     });
 
@@ -573,6 +589,24 @@
 
   P.retire = function () {
     var cfg = this.cfg, A = this.agents;
+    // Retire-to-Mentor: mentors whose phase-out is over retire for real now.
+    for (var mi = this.mentors.length - 1; mi >= 0; mi--) {
+      var ma = this.mentors[mi];
+      if (A.mentorUntilQ[ma] - 1 > this.q) continue;
+      this.mentors[mi] = this.mentors[this.mentors.length - 1];
+      this.mentors.pop();
+      A.mentorUntilQ[ma] = 0;
+      var mc = this.companies[A.company[ma]], mlevel = A.level[ma], mband = A.band[ma];
+      mc.mentorCount--;
+      this.leaveCompany(ma);
+      mc.qc.retired++;
+      this.events.push(ma, this.q, EV.RETIRE, mc.idx, A.comp[ma]);
+      this.backfill(mc, mlevel, mband);
+      A.status[ma] = S.RETIRED;
+      this.leaveActive(ma);
+      this.flow.retired++;
+      this.flow.mentorRetired++;
+    }
     this.retireCarry += (this.employedCount() + this.pool.length) * cfg.retirePct / 100 / 4;
     var n = Math.floor(this.retireCarry);
     this.retireCarry -= n;
@@ -581,6 +615,18 @@
       var a = this.active[this.randInt(this.active.length)];
       var w = Math.min(1, Math.pow(A.exp[a] / 35, 3));
       if (this.rand() >= w) continue;
+      if (A.mentorUntilQ[a]) continue; // already phasing out
+      if (A.status[a] === S.EMPLOYED && cfg.mentorSharePct && this.rand() * 100 < cfg.mentorSharePct) {
+        // Phased retirement: keep the seat (no backfill yet), retire for real later.
+        var co = this.companies[A.company[a]];
+        A.mentorUntilQ[a] = this.q + cfg.mentorQuarters + 1;
+        co.mentorCount++;
+        this.mentors.push(a);
+        this.events.push(a, this.q, EV.MENTOR, co.idx, A.comp[a]);
+        this.flow.mentorsNew++;
+        n--;
+        continue;
+      }
       if (A.status[a] === S.EMPLOYED) {
         var level = A.level[a], band = A.band[a];
         var c = this.leaveCompany(a);
@@ -600,6 +646,8 @@
 
   P.quit = function (a) {
     var A = this.agents, level = A.level[a], band = A.band[a];
+    // First-year quits of grad hires, split by whether a mentor was there (bookkeeping only).
+    if (A.gradHireQ[a] && this.q - (A.gradHireQ[a] - 1) <= 4) this.flow.gradEarlyQuits[A.mentoredUntilQ[a] ? 1 : 0]++;
     var c = this.leaveCompany(a);
     this.joinPool(a, S.SWITCHER, A.comp[a] * (1 + this.cfg.switchPremiumPct / 100));
     c.qc.leavers++;
@@ -617,12 +665,12 @@
       if (level - 1 === 0) {
         for (i = 0; i < 24; i++) {
           a = c.members[this.randInt(c.members.length)];
-          if (A.level[a] === 0 && A.exp[a] >= MIN_EXP[level] && (best < 0 || A.exp[a] > A.exp[best])) best = a;
+          if (A.level[a] === 0 && A.exp[a] >= MIN_EXP[level] && !A.mentorUntilQ[a] && (best < 0 || A.exp[a] > A.exp[best])) best = a;
         }
       } else {
         for (i = 0; i < c.members.length; i++) {
           a = c.members[i];
-          if (A.level[a] === level - 1 && A.exp[a] >= MIN_EXP[level] && (best < 0 || A.exp[a] > A.exp[best])) best = a;
+          if (A.level[a] === level - 1 && A.exp[a] >= MIN_EXP[level] && !A.mentorUntilQ[a] && (best < 0 || A.exp[a] > A.exp[best])) best = a;
         }
       }
       if (best >= 0) {
@@ -651,13 +699,16 @@
       var n = Math.floor(expected) + (self.rand() < expected - Math.floor(expected) ? 1 : 0);
       if (n <= 0) return;
       var victims;
+      // Mentors (Retire-to-Mentor) are never laid off; with no mentors this is the original pick.
+      var pickable = c.mentorCount ? c.members.filter(function (m) { return !A.mentorUntilQ[m]; }) : c.members;
+      n = Math.min(n, pickable.length);
       if (cfg.layoffTargeting === 1) {
-        victims = c.members.slice().sort(function (x, y) { return A.comp[y] / A.band[y] - A.comp[x] / A.band[x]; }).slice(0, n);
+        victims = pickable.slice().sort(function (x, y) { return A.comp[y] / A.band[y] - A.comp[x] / A.band[x]; }).slice(0, n);
       } else {
         victims = [];
         var picked = {};
-        while (victims.length < n && victims.length < c.members.length) {
-          var a = c.members[self.randInt(c.members.length)];
+        while (victims.length < n && victims.length < pickable.length) {
+          var a = pickable[self.randInt(pickable.length)];
           if (!picked[a]) { picked[a] = true; victims.push(a); }
         }
       }
@@ -903,6 +954,10 @@
     var A = this.agents, flow = this.flow;
     var source = A.status[a];
     if (source === S.LAID_OFF && A.idleQ[a] === 0) flow.laidOffSameQ++; // laid off and re-employed in the same quarter
+    var mentored = source === S.GRAD && c.mentorCount > 0;
+    A.gradHireQ[a] = source === S.GRAD ? this.q + 1 : 0;
+    A.mentoredUntilQ[a] = mentored ? this.q + 5 : 0; // the 4 quarters after the hire quarter
+    if (source === S.GRAD) flow.gradHires[mentored ? 1 : 0]++;
     this.leavePool(a);
     this.joinCompany(a, c, r.level);
     A.comp[a] = offer;
@@ -1003,6 +1058,9 @@
       unofferedShare: this.pool.length ? unoffered / this.pool.length : 0,
       retiredTotal: retired, exitedTotal: exited,
       handoffs: f.handoffs || 0, laidOffSameQ: f.laidOffSameQ || 0,
+      mentorsActive: this.mentors.length, mentorsNew: f.mentorsNew || 0, mentorRetired: f.mentorRetired || 0,
+      gradHiresMentored: f.gradHires ? f.gradHires[1] : 0, gradHiresUnmentored: f.gradHires ? f.gradHires[0] : 0,
+      gradEarlyQuitsMentored: f.gradEarlyQuits ? f.gradEarlyQuits[1] : 0, gradEarlyQuitsUnmentored: f.gradEarlyQuits ? f.gradEarlyQuits[0] : 0,
       handoffPairs: Object.keys(f.handoffPairs || {}).map(function (k) {
         var parts = k.split(':');
         return [Number(parts[0]), Number(parts[1]), f.handoffPairs[k]];

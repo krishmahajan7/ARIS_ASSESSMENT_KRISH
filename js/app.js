@@ -60,6 +60,11 @@
       { key: 'handoffCountsTowardCap', label: 'Handoff hires count toward the cap', toggle: true, hint: 'On = the brief’s 5% rule (jobs move between groups). Off = a policy lever that lets redeployment bypass the cap.' },
       { key: 'handoffRadiusMiles', label: 'Handoff radius, HQ to HQ', unit: 'mi', min: 5, max: 60, step: 5 },
       { key: 'handoffSharePct', label: 'Laid-off people offered a handoff', unit: '%', min: 0, max: 100, step: 10 },
+      { key: 'mentorSharePct', label: 'Retire-to-Mentor: retirees who phase out', unit: '%', min: 0, max: 100, step: 10,
+        hint: '0 = off. A retiring employee keeps their seat as a mentor for a while, so no backfill opens yet, then retires for real.' },
+      { key: 'mentorQuarters', label: 'Mentoring period', unit: 'qtrs', min: 1, max: 12, step: 1 },
+      { key: 'mentorAttritionCut', label: 'Grad quit-rate cut where a mentor works', unit: '% (assumption)', min: 0, max: 60, step: 5,
+        hint: 'ASSUMPTION, not evidence. Measured: almost all of the grad-retention gain comes from this number; the headcount and unemployment gains come from mentors keeping their seats (they also appear at 0%).' },
     ] },
   ];
   var SPEEDS = [0.5, 1, 2, 4, 8];
@@ -269,7 +274,8 @@
       + kpi('Pay vs position band', fmt.signedPct(gap), '<span>' + fmt.money(last.avgComp) + ' avg · band ' + fmt.money(last.avgBand) + '</span>')
       + kpi('Hiring spend', fmt.money(last.hireSpend), '<span>this quarter · ' + fmt.money(total) + ' to date</span>')
       + kpi('Avg commute', fmt.miles(last.avgCommute), '<span>new hires ' + (last.hireCommute != null ? fmt.miles(last.hireCommute) : '—') + ' · start ' + fmt.miles(first.avgCommute) + '</span>')
-      + reemployedKpi(s);
+      + reemployedKpi(s)
+      + mentorKpi(s, last);
   }
 
   // Laid off and hired again in the same quarter (any route), since the start.
@@ -278,6 +284,17 @@
     s.forEach(function (x) { laid += x.layoffs; same += x.laidOffSameQ || 0; hand += x.handoffs || 0; });
     return kpi('Re-employed same quarter', laid ? fmt.pct(same / laid) : '—',
       '<span>of ' + fmt.k(laid) + ' laid off · ' + (state.cfg.warmHandoff ? fmt.k(hand) + ' via warm handoff' : 'warm handoff off') + '</span>');
+  }
+
+  // Retire-to-Mentor: mentors now, and how recently hired grads stay.
+  function mentorKpi(s, last) {
+    var hm = 0, hu = 0, qm = 0, qu = 0;
+    s.forEach(function (x) { hm += x.gradHiresMentored || 0; hu += x.gradHiresUnmentored || 0; qm += x.gradEarlyQuitsMentored || 0; qu += x.gradEarlyQuitsUnmentored || 0; });
+    if (!state.cfg.mentorSharePct) {
+      return kpi('Grad first-year quits', hu ? fmt.pct(qu / hu) : '—', '<span>of grad hires · Retire-to-Mentor off</span>');
+    }
+    return kpi('Mentors active', fmt.int(last.mentorsActive || 0),
+      '<span>grad first-year quits ' + (hm ? fmt.pct(qm / hm, 0) : '—') + ' with a mentor · ' + (hu ? fmt.pct(qu / hu, 0) : '—') + ' without</span>');
   }
 
   var CHART_TABS = [['market', 'Jobs & people'], ['flows', 'Flows'], ['pay', 'Pay & commute'], ['vis', 'Visibility']];
