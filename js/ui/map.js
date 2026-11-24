@@ -106,6 +106,7 @@
       return t;
     });
     this.gCities = el('g', {}, this.vp);
+    this.gCorr = el('g', {}, this.vp);
     this.gShed = el('g', {}, this.vp);
     this.gFlows = el('g', {}, this.vp);
     this.gStartups = el('g', {}, this.vp);
@@ -278,6 +279,23 @@
     });
   };
 
+  // Bay Corridors: a thick line per corridor, home city → job city.
+  M.setCorridors = function (list, picking) {
+    var self = this;
+    this.gCorr.innerHTML = '';
+    (list || []).forEach(function (k, n) {
+      var a = self.cityXY(k.from), b = self.cityXY(k.to);
+      el('line', { class: 'corridor', x1: a[0], y1: a[1], x2: b[0], y2: b[1] }, self.gCorr);
+      el('circle', { class: 'corridor-end', cx: a[0], cy: a[1], r: 5 }, self.gCorr);
+      el('circle', { class: 'corridor-end hub', cx: b[0], cy: b[1], r: 6 }, self.gCorr);
+      var t = el('text', { class: 'corridor-label', x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, self.gCorr);
+      t.textContent = 'C' + (n + 1);
+    });
+    this.cityDots.forEach(function (d, i) { d.classList.toggle('picking', picking === i); });
+    this.svg.classList.toggle('drawing', picking != null);
+    this.applyZoom();
+  };
+
   M.select = function (c) {
     this.selected = c;
     var self = this;
@@ -325,6 +343,8 @@
       l.el.setAttribute('font-size', (10.5 * u).toFixed(3));
     });
     this.waterLabels.forEach(function (t) { t.setAttribute('font-size', (t._size * u).toFixed(3)); });
+    this.gCorr.querySelectorAll('.corridor-end').forEach(function (c) { c.setAttribute('r', ((c.classList.contains('hub') ? 6 : 5) * u).toFixed(3)); });
+    this.gCorr.querySelectorAll('.corridor-label').forEach(function (t) { t.setAttribute('font-size', (11 * u).toFixed(3)); });
   };
 
   M.toSvg = function (clientX, clientY) {
@@ -416,6 +436,7 @@
       + '<div class="row"><div class="ramp" style="background:linear-gradient(90deg,' + s0 + ',' + s1 + ')"></div></div>'
       + '<div class="ends"><span>0% unemployed</span><span>25%+</span></div>'
       + '<div class="row"><svg width="28" height="10" aria-hidden="true"><path d="M2 8 Q14 0 26 8" fill="none" stroke="var(--s-blue)" stroke-width="2" stroke-dasharray="3 3"/></svg><span>this quarter’s hires, home → HQ</span></div>'
+      + (this.sim && this.sim.corridors && this.sim.corridors.length ? '<div class="row"><svg width="28" height="10" aria-hidden="true"><line x1="3" y1="5" x2="25" y2="5" stroke="var(--s-violet)" stroke-width="4" stroke-linecap="round"/></svg><span>Bay Corridors (shuttle lines)</span></div>' : '')
       + (this.sim && this.sim.cfg.warmHandoff ? '<div class="row"><svg width="28" height="10" aria-hidden="true"><path d="M2 8 Q14 0 26 8" fill="none" stroke="var(--s-aqua)" stroke-width="2.2"/></svg><span>warm handoffs, old HQ → new HQ</span></div>' : '')
       + '<div class="row"><svg width="28" height="10" aria-hidden="true"><circle cx="6" cy="5" r="2.5" fill="var(--s-aqua)"/><circle cx="14" cy="6" r="2.5" fill="var(--s-aqua)"/><circle cx="21" cy="3" r="2.5" fill="var(--s-aqua)"/></svg><span>startups</span></div>';
   };

@@ -166,9 +166,12 @@
 
   function lockControls() {
     var lock = locked();
+    if (lock && state.drawing) { state.drawing = false; state.drawFrom = null; }
+    if (state.sim) renderCorridors();
     document.querySelector('.sidebar').classList.toggle('locked', lock);
     document.querySelectorAll('#config input, #config .seg, #dice').forEach(function (e) { e.disabled = lock; });
     $('btn-defaults').disabled = lock;
+    if (lock) $('draw-hint').hidden = true;
   }
 
   // ---------------------------------------------------------------- run control
@@ -237,6 +240,7 @@
 
   function renderAll() {
     var sim = state.sim, s = sim.series, last = s[s.length - 1], first = s[0];
+    renderCorridors();
     $('clock').textContent = last.label;
     $('clock-q').textContent = sim.q + ' of ' + sim.quarters + ' quarters';
     $('progress').style.width = (sim.q / sim.quarters * 100) + '%';
@@ -438,7 +442,10 @@
     geo: window.BAY_GEO, cities: DATA.cities,
     on: {
       company: function (c) { openOverlay(function () { overlays.company(c.idx); }); },
-      city: function (i) { openOverlay(function () { overlays.city(i); }); },
+      city: function (i) {
+        if (state.drawing) { pickCorridorCity(i); return; }
+        openOverlay(function () { overlays.city(i); });
+      },
       companyHover: function (c, e) { showTip(companyTip(c), e); },
       cityHover: function (i, e) { showTip(cityTip(i), e); },
       leave: hideTip,
@@ -472,6 +479,67 @@
         start();
       },
     },
+  });
+
+  // ---------------------------------------------------------------- Bay Corridors
+
+  function corridorsChanged() {
+    state.drawing = false;
+    state.drawFrom = null;
+    newRun();
+  }
+  function pickCorridorCity(i) {
+    if (locked()) { state.drawing = false; renderCorridors(); return; }
+    if (state.drawFrom == null) { state.drawFrom = i; renderCorridors(); return; }
+    if (i === state.drawFrom) { state.drawFrom = null; renderCorridors(); return; }
+    var A = W.ASSUMPTIONS;
+    state.corridors.push({ from: state.drawFrom, to: i, cutPct: A.corridorCutPct, spillMiles: A.corridorSpillMiles });
+    corridorsChanged();
+  }
+  function renderCorridors() {
+    var sim = state.sim, A = W.ASSUMPTIONS, last = sim.series[sim.series.length - 1];
+    map.setCorridors(state.corridors, state.drawing ? (state.drawFrom == null ? -1 : state.drawFrom) : null);
+    var hint = $('draw-hint');
+    hint.hidden = !state.drawing;
+    hint.textContent = state.drawFrom == null ? 'Draw a corridor: click the home city (where people live)…' : 'From ' + sim.cities[state.drawFrom].name + ': now click the job city (the hub). Click it again to cancel.';
+    var name = function (i) { return esc(sim.cities[i].name); };
+    var list = state.corridors.map(function (k, n) {
+      return '<span class="corr-chip"><b>C' + (n + 1) + '</b> ' + name(k.from) + ' → ' + name(k.to) + ' <span class="muted">−' + k.cutPct + '%</span>'
+        + '<button type="button" class="corr-x" data-corr-remove="' + n + '" aria-label="Remove corridor"' + (locked() ? ' disabled' : '') + '>✕</button></span>';
+    }).join('');
+    var hours = last.avgCommute * A.tripsPerDay * A.daysPerWeek / A.mph;
+    var hours0 = last.avgCommuteNoCorridors * A.tripsPerDay * A.daysPerWeek / A.mph;
+    var co2 = last.employed * last.avgCommute * A.tripsPerDay * A.daysPerWeek * A.weeksPerQuarter * A.kgCo2PerMile / 1000;
+    var co20 = last.employed * last.avgCommuteNoCorridors * A.tripsPerDay * A.daysPerWeek * A.weeksPerQuarter * A.kgCo2PerMile / 1000;
+    var us = state.cityRows.filter(function (r) { return r.laborForce > 200; }).map(function (r) { return r.unemployment; }).sort(function (a, b) { return a - b; });
+    var q = function (p) { var i = (us.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return us.length ? us[lo] + (us[hi] - us[lo]) * (i - lo) : 0; };
+    var has = state.corridors.length > 0;
+    $('corridor-bar').innerHTML = '<div class="corr-tools"><b>Bay Corridors</b>'
+      + '<button class="btn" type="button" id="corr-draw" aria-pressed="' + !!state.drawing + '"' + (locked() ? ' disabled' : '') + '>' + (state.drawing ? 'Cancel drawing' : 'Draw corridor') + '</button>'
+      + '<button class="btn" type="button" id="corr-suggest"' + (locked() ? ' disabled' : '') + ' title="The 3 home → job city pairs with the most people looking (weighted by local unemployment) against open seats, where a corridor would most raise acceptance. Computed from the current run.">Suggest 3</button>'
+      + (has ? '<button class="link" type="button" id="corr-clear"' + (locked() ? ' disabled' : '') + '>Clear</button>' : '')
+      + '<span class="corr-list">' + (list || '<span class="muted">None. A corridor (shuttle line + hub) cuts effective commute miles between two cities and their neighbours.</span>') + '</span></div>'
+      + '<div class="corr-kpis">'
+      + '<span title="ASSUMPTION: $' + fmt.k(A.corridorCostPerQuarter) + ' per corridor per quarter">Cost <b>' + fmt.money(state.corridors.length * A.corridorCostPerQuarter) + '</b>/qtr <i>assumed</i></span>'
+      + '<span title="ASSUMPTION: 2 trips a day, 5 days a week, 30 mph">Commute <b>' + hours.toFixed(1) + ' h</b>/wk' + (has ? ' <span class="muted">(' + hours0.toFixed(1) + ' h without lines)</span>' : '') + ' <i>assumed</i></span>'
+      + '<span title="ASSUMPTION: 0.4 kg CO2 per vehicle mile, one person per car">CO₂ <b>' + fmt.k(co2) + ' t</b>/qtr' + (has ? ' <span class="muted">(' + fmt.k(co20) + ' t without)</span>' : '') + ' <i>assumed</i></span>'
+      + '<span title="Unemployment of the 90th-percentile city minus the 10th (cities with 200+ engineers)">City gap p90−p10 <b>' + fmt.pct(q(0.9) - q(0.1)) + '</b></span>'
+      + '</div>';
+  }
+  $('corridor-bar').addEventListener('click', function (e) {
+    if (locked()) return;
+    var rm = e.target.closest('[data-corr-remove]');
+    if (rm) { state.corridors.splice(Number(rm.getAttribute('data-corr-remove')), 1); corridorsChanged(); return; }
+    if (e.target.closest('#corr-draw')) { state.drawing = !state.drawing; state.drawFrom = null; renderCorridors(); return; }
+    if (e.target.closest('#corr-clear')) { state.corridors = []; corridorsChanged(); return; }
+    if (e.target.closest('#corr-suggest')) {
+      var have = {}, added = 0;
+      state.corridors.forEach(function (k) { have[k.from + ':' + k.to] = true; });
+      state.sim.suggestCorridors(6).forEach(function (k) {
+        if (added < 3 && !have[k.from + ':' + k.to] && state.corridors.length < 8) { state.corridors.push(k); have[k.from + ':' + k.to] = true; added++; }
+      });
+      corridorsChanged();
+    }
   });
 
   // The uplift settings that differ from the original model, for labels.
@@ -517,6 +585,7 @@
   $('btn-defaults').addEventListener('click', function () {
     if (locked()) return;
     state.cfg = Object.assign({}, W.DEFAULTS);
+    state.corridors = [];
     syncControls();
     newRun();
   });

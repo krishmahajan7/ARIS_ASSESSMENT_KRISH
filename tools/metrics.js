@@ -16,7 +16,9 @@ function runConfig(cfg) {
   const t0 = Date.now();
   const extras = {};
   const numeric = {};
-  Object.keys(cfg || {}).forEach((k) => { if (Array.isArray(cfg[k])) extras[k] = cfg[k]; else numeric[k] = cfg[k]; });
+  Object.keys(cfg || {}).forEach((k) => { if (k === 'corridors' || Array.isArray(cfg[k])) extras[k] = cfg[k]; else numeric[k] = cfg[k]; });
+  // corridors: 'suggest' = the engine's top 3 suggestions for this config at the start of the run.
+  if (extras.corridors === 'suggest') extras.corridors = new W.WorkforceSim(numeric, data).suggestCorridors(3);
   const sim = new W.WorkforceSim(numeric, data, extras).runToEnd();
   return { sim, metrics: M.personaMetrics(sim, W), ms: Date.now() - t0 };
 }

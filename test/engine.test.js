@@ -330,4 +330,28 @@ test('Warm Handoff: cap-exempt lever hires more than the faithful reading', () =
   assert(sum(b) > sum(a), 'exempt handoffs should add hires');
 });
 
+test('Bay Corridors: only shorten distances, never below 3 miles, stay symmetric; none = original', () => {
+  const plain = make({ years: 1 });
+  sameAsOriginal({ companies: 60, years: 2, seed: 3 }, 'no corridors');
+  const sf = 0, mv = 16, rafael = 46;
+  const corridors = [{ from: rafael, to: sf, cutPct: 90 }, { from: sf, to: mv }, { from: 3, to: 3 }, { from: 999, to: 1 }];
+  const sim = new W.WorkforceSim({ companies: 60, years: 1 }, data, { corridors });
+  assert.strictEqual(sim.corridors.length, 2, 'invalid corridors are dropped');
+  let shorter = 0;
+  for (let i = 0; i < sim.dist.length; i++) {
+    for (let j = 0; j < sim.dist.length; j++) {
+      assert(sim.dist[i][j] <= plain.dist[i][j] + 1e-6, `corridor lengthened ${i}→${j}`);
+      assert(sim.dist[i][j] >= 3 - 1e-6, `below 3 miles ${i}→${j}`);
+      assert.strictEqual(sim.dist[i][j], sim.dist[j][i], `asymmetric ${i}↔${j}`);
+      if (sim.dist[i][j] < plain.dist[i][j] - 1e-6) shorter++;
+    }
+  }
+  assert(sim.dist[sf][mv] < plain.dist[sf][mv] * 0.61, 'SF → Mountain View cut by ~40%');
+  assert(shorter >= 4, 'the spill reaches neighbouring cities');
+  const sug = sim.suggestCorridors(3);
+  assert(sug.length === 3 && sug.every((k) => k.from !== k.to), 'three suggestions');
+  sim.runToEnd();
+  checkBooks(sim);
+});
+
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

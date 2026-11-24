@@ -96,6 +96,17 @@
   var GRAD_COMP = 140000;
   var INTRA_CITY_MILES = 3;
   var ROAD_FACTOR = 1.2;
+  // Bay Corridors. Every number here is an ASSUMPTION for illustration, not a
+  // sourced figure: what a corridor costs to run, and how commute miles turn
+  // into hours and CO2.
+  var ASSUMPTIONS = {
+    corridorCostPerQuarter: 250000, // $ per corridor per quarter (shuttle service + hub)
+    corridorCutPct: 40,             // effective commute miles saved on a corridor
+    corridorSpillMiles: 8,          // cities this close to the corridor's home end also use it
+    tripsPerDay: 2, daysPerWeek: 5, mph: 30, // commute hours = miles × 2 × 5 ÷ 30
+    kgCo2PerMile: 0.4,              // per vehicle mile, one person per car
+    weeksPerQuarter: 13,
+  };
 
   var S = { EMPLOYED: 0, GRAD: 1, SWITCHER: 2, LAID_OFF: 3, RETIRED: 4, EXITED: 5 };
   var STATUS_NAMES = ['Employed', 'New grad (pool)', 'Switching jobs (pool)', 'Laid off (pool)', 'Retired', 'Left Bay Area'];
@@ -267,7 +278,18 @@
 
   // ------------------------------------------------------------------ simulation
 
-  function WorkforceSim(input, data) {
+  // Corridors arrive outside the numeric settings: [{ from, to, cutPct, spillMiles }].
+  function normalizeCorridors(list, nCities) {
+    if (!Array.isArray(list)) return [];
+    return list.map(function (k) {
+      var from = Math.round(Number(k && k.from)), to = Math.round(Number(k && k.to));
+      var cut = k && k.cutPct != null ? Number(k.cutPct) : ASSUMPTIONS.corridorCutPct;
+      var spill = k && k.spillMiles != null ? Number(k.spillMiles) : ASSUMPTIONS.corridorSpillMiles;
+      return { from: from, to: to, cutPct: Math.max(0, Math.min(90, isFinite(cut) ? cut : 40)), spillMiles: Math.max(0, Math.min(25, isFinite(spill) ? spill : 8)) };
+    }).filter(function (k) { return k.from >= 0 && k.to >= 0 && k.from < nCities && k.to < nCities && k.from !== k.to; });
+  }
+
+  function WorkforceSim(input, data, extras) {
     var cfg = this.cfg = normalizeConfig(input);
     var rng = this.rng = mulberry32(cfg.seed);
     this.cities = data.cities;
@@ -294,6 +316,22 @@
         this.dist[i][j] = i === j ? INTRA_CITY_MILES
           : Math.max(INTRA_CITY_MILES, haversineMiles(this.cities[i], this.cities[j]) * ROAD_FACTOR);
       }
+    }
+    // Bay Corridors (opt-in): shorten effective commutes between a home city
+    // (plus its neighbours within spillMiles) and a job city. Only ever
+    // reduces a distance, never below INTRA_CITY_MILES, and stays symmetric.
+    this.corridors = normalizeCorridors(extras && extras.corridors, nC);
+    if (this.corridors.length) {
+      this.dist0 = this.dist.map(function (row) { return Float32Array.from(row); });
+      var d0 = this.dist0, dist = this.dist, cities = this.cities;
+      this.corridors.forEach(function (k) {
+        for (var h = 0; h < nC; h++) {
+          if (h !== k.from && haversineMiles(cities[h], cities[k.from]) * ROAD_FACTOR > k.spillMiles) continue;
+          if (h === k.to) continue;
+          var cut = Math.max(INTRA_CITY_MILES, d0[h][k.to] * (1 - k.cutPct / 100));
+          if (cut < dist[h][k.to]) { dist[h][k.to] = cut; dist[k.to][h] = cut; }
+        }
+      });
     }
     var cityIndex = {};
     this.cities.forEach(function (c, idx) { cityIndex[c.name] = idx; });
@@ -909,6 +947,7 @@
     var A = this.agents, self = this;
     var employedLarge = 0, employedStartup = 0, payroll = 0, compSum = 0, bandSum = 0, commuteSum = 0, n = 0;
     var openReqs = 0, backfills = 0, oldReqs = 0, capHit = 0;
+    var raw = this.dist0 || this.dist, rawCommute = 0;
     this.companies.forEach(function (c) {
       var cPay = 0, cBand = 0, cCommute = 0;
       for (var i = 0; i < c.members.length; i++) {
@@ -916,6 +955,7 @@
         cPay += A.comp[a];
         cBand += A.band[a];
         cCommute += self.dist[A.city[a]][c.city];
+        rawCommute += raw[A.city[a]][c.city];
       }
       var hc = c.members.length;
       if (c.kind === 'large') employedLarge += hc; else employedStartup += hc;
@@ -974,6 +1014,7 @@
       avgComp: n ? compSum / n : 0, avgBand: n ? bandSum / n : 0,
       avgHireComp: f.hires ? f.hireComp / f.hires : null,
       avgCommute: n ? commuteSum / n : 0, hireCommute: f.hires ? f.hireCommute / f.hires : null,
+      avgCommuteNoCorridors: n ? rawCommute / n : 0, // same people, same jobs, original distances
       avgFillAge: f.hires ? f.fillAge / f.hires : null,
       gradComp: this.gradComp,
       pairs: pairs.slice(0, 120),
@@ -1028,6 +1069,40 @@
       status: [status[S.GRAD], status[S.SWITCHER], status[S.LAID_OFF]].map(share),
       regions: Object.keys(regions).map(function (k) { return share(regions[k]); }).sort(function (x, y) { return y.unseenShare - x.unseenShare; }),
     };
+  };
+
+  // Where would a corridor help most right now? Pairs (home city, job city)
+  // scored by people looking in the home city × its unemployment rate × open seats at HQs in the job
+  // city × how much a corridor would raise P(accept) for that commute. With no
+  // open reqs yet (before the first quarter), headcount stands in for demand.
+  P.suggestCorridors = function (n) {
+    var A = this.agents, nC = this.cities.length, cfg = this.cfg, self = this;
+    var looking = new Array(nC).fill(0), demand = new Array(nC).fill(0), anyReqs = false;
+    for (var p = 0; p < this.pool.length; p++) looking[A.city[this.pool[p]]]++;
+    var lf = new Array(nC).fill(0);
+    this.companies.forEach(function (c) { for (var m = 0; m < c.members.length; m++) lf[A.city[c.members[m]]]++; });
+    var rate = looking.map(function (x, i) { return x + lf[i] ? x / (x + lf[i]) : 0; });
+    this.companies.forEach(function (c) { if (c.reqs.length) anyReqs = true; });
+    this.companies.forEach(function (c) { demand[c.city] += anyReqs ? c.reqs.length : c.members.length; });
+    var cut = ASSUMPTIONS.corridorCutPct / 100, pairs = [];
+    for (var i = 0; i < nC; i++) {
+      if (!looking[i]) continue;
+      for (var j = 0; j < nC; j++) {
+        var d = self.dist[i][j];
+        if (!demand[j] || i === j || d < 10) continue;
+        var gain = Math.pow(2, -d * (1 - cut) / cfg.nearbyMiles) - Math.pow(2, -d / cfg.nearbyMiles);
+        // need = looking × local unemployment rate: favours the hardest-hit home cities, not just the biggest.
+        pairs.push({ from: i, to: j, score: looking[i] * rate[i] * demand[j] * gain });
+      }
+    }
+    pairs.sort(function (x, y) { return y.score - x.score; });
+    var out = [], usedFrom = {};
+    for (var k = 0; k < pairs.length && out.length < (n || 3); k++) {
+      if (usedFrom[pairs[k].from]) continue; // spread suggestions across home cities
+      usedFrom[pairs[k].from] = true;
+      out.push({ from: pairs[k].from, to: pairs[k].to, cutPct: ASSUMPTIONS.corridorCutPct, spillMiles: ASSUMPTIONS.corridorSpillMiles });
+    }
+    return out;
   };
 
   // Residents of each city right now.
@@ -1115,7 +1190,7 @@
   };
 
   var api = {
-    DEFAULTS: DEFAULTS, LEVEL_NAMES: LEVEL_NAMES, MIN_EXP: MIN_EXP, STATUS: S, STATUS_NAMES: STATUS_NAMES,
+    DEFAULTS: DEFAULTS, ASSUMPTIONS: ASSUMPTIONS, normalizeCorridors: normalizeCorridors, LEVEL_NAMES: LEVEL_NAMES, MIN_EXP: MIN_EXP, STATUS: S, STATUS_NAMES: STATUS_NAMES,
     EV: EV, EVENT_NAMES: EVENT_NAMES, START_YEAR: START_YEAR,
     normalizeConfig: normalizeConfig, pyramid: pyramid, pyramidForHeadcount: pyramidForHeadcount,
     haversineMiles: haversineMiles, nameOf: nameOf, WorkforceSim: WorkforceSim,
