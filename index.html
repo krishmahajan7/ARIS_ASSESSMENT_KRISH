@@ -48,6 +48,18 @@
 
   <div class="layout">
     <aside class="sidebar" aria-label="Settings">
+      <section class="presets" aria-label="Presets and guided demo">
+        <div class="presets-head"><b>Presets</b><button class="btn primary demo-btn" type="button" id="btn-demo" title="Loads “All uplift”, then compares it with the original model in the Policy Lab">▶ 3-minute demo</button></div>
+        <div class="preset-list" id="preset-list"></div>
+        <details class="demo-steps"><summary>What to look at</summary><ol>
+          <li><b>3-minute demo</b>: the Policy Lab compares the original model with all four features on, same seed. Read “Who gains / Who loses”.</li>
+          <li><b>Fair-Chance</b> preset, then the <b>Visibility</b> tab: new grads land on slates but rarely get an offer; fit ranking changes who gets one.</li>
+          <li><b>Warm Handoff</b> preset, press <b>+1 quarter</b>: aqua arcs on the map are laid-off people redeployed the same quarter.</li>
+          <li><b>Bay Corridors</b>: purple lines under the map; draw your own or press <b>Suggest 3</b>.</li>
+          <li><b>Retire-to-Mentor</b>: the “Mentors active” card, and grad quits with and without a mentor.</li>
+          <li>Policy Lab, <b>Stress tests</b> and <b>Autopilot</b>: does it still help in a recession; which mix your weights prefer.</li>
+        </ol></details>
+      </section>
       <div id="config"></div>
       <p class="lock-note">Settings are locked during a run. Reset to change them.</p>
       <div class="sidebar-foot">

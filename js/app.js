@@ -68,6 +68,16 @@
     ] },
   ];
   var SPEEDS = [0.5, 1, 2, 4, 8];
+  // Presets only touch the uplift features; the brief's rules stay as set.
+  var PRESETS = [
+    ['original', 'Original', {}, 'The simulator as provided: every uplift feature off.'],
+    ['all', 'All uplift', { fairScreening: 1, warmHandoff: 1, mentorSharePct: 50, corridors: 'suggest' }, 'All four features, cap-faithful (handoffs count toward the cap).'],
+    ['fair', 'Fair-Chance', { fairScreening: 1 }, 'Offer by fit, not seniority.'],
+    ['handoff', 'Warm Handoff', { warmHandoff: 1 }, 'Laid-off people get first look at nearby open seats.'],
+    ['handoffLever', 'Handoff, cap-exempt', { warmHandoff: 1, handoffCountsTowardCap: 0 }, 'Policy lever: redeployment bypasses the 5% cap.'],
+    ['corridors', 'Bay Corridors', { corridors: 'suggest' }, 'Three suggested shuttle corridors.'],
+    ['mentor', 'Retire-to-Mentor', { mentorSharePct: 50 }, 'Half of retirees phase out as mentors for 4 quarters.'],
+  ];
   var LAYERS = [['hqs', 'Company HQs', 'var(--s-blue)'], ['startups', 'Startups', 'var(--s-aqua)'], ['residents', 'Where engineers live', 'var(--s-orange)'], ['flows', 'Hiring flows', 'var(--s-blue)']];
 
   var $ = function (id) { return document.getElementById(id); };
@@ -75,6 +85,7 @@
     cfg: Object.assign({}, W.DEFAULTS),
     sim: null, status: 'ready', speed: 2, timer: null, chartTab: 'market', cityRows: null,
     corridors: [], // Bay Corridors: [{ from, to, cutPct, spillMiles }], outside the numeric settings
+    preset: 'original', drawing: false, drawFrom: null,
   };
   var UPLIFT_KEYS = [];
   var inputs = {};
@@ -163,6 +174,7 @@
 
   function setConfig(key, raw) {
     if (locked()) return;
+    if (UPLIFT_KEYS.indexOf(key) >= 0 && state.preset) { state.preset = null; renderPresets(); }
     state.cfg[key] = clamp(inputs[key].def, raw);
     syncControls();
     clearTimeout(setConfig.t);
@@ -172,6 +184,7 @@
   function lockControls() {
     var lock = locked();
     if (lock && state.drawing) { state.drawing = false; state.drawFrom = null; }
+    if ($('preset-list').children.length) renderPresets();
     if (state.sim) renderCorridors();
     document.querySelector('.sidebar').classList.toggle('locked', lock);
     document.querySelectorAll('#config input, #config .seg, #dice').forEach(function (e) { e.disabled = lock; });
@@ -501,6 +514,7 @@
   // ---------------------------------------------------------------- Bay Corridors
 
   function corridorsChanged() {
+    if (state.preset) { state.preset = null; renderPresets(); }
     state.drawing = false;
     state.drawFrom = null;
     newRun();
@@ -603,6 +617,8 @@
     if (locked()) return;
     state.cfg = Object.assign({}, W.DEFAULTS);
     state.corridors = [];
+    state.preset = 'original';
+    renderPresets();
     syncControls();
     newRun();
   });
@@ -688,7 +704,35 @@
     $('legend-open').hidden = true;
   });
 
+  // ---------------------------------------------------------------- presets and demo
+
+  function renderPresets() {
+    $('preset-list').innerHTML = PRESETS.map(function (p) {
+      return '<button class="chip-btn preset" type="button" data-preset="' + p[0] + '" aria-pressed="' + (state.preset === p[0]) + '" title="' + Charts.attr(p[3]) + '"' + (locked() ? ' disabled' : '') + '>' + p[1] + '</button>';
+    }).join('');
+    $('btn-demo').disabled = false;
+  }
+  function loadPreset(id) {
+    var p = PRESETS.filter(function (x) { return x[0] === id; })[0];
+    if (!p) return;
+    applyPolicy(p[2]);
+    state.preset = id;
+    renderPresets();
+  }
+  $('preset-list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-preset]');
+    if (b && !locked()) loadPreset(b.getAttribute('data-preset'));
+  });
+  $('btn-demo').addEventListener('click', function () {
+    loadPreset('all');
+    overlays.lab('compare');
+    var l = overlays.app.lab();
+    l.scale = 'quick';
+    l.runCompare('compare', {});
+  });
+
   buildControls();
+  renderPresets();
   renderLegend();
   newRun();
 })();
