@@ -1,150 +1,156 @@
 # BayWork — who the Bay Area engineering market fails, and five ways to help them
 
-BayWork is a quarter-by-quarter model of hiring, attrition, layoffs, graduations, retirements and pay across the Bay
-Area's engineering workforce. It simulates every engineer and manager individually: about 270,000 people at default
-settings.
+## Summary
 
-This version **builds on the original simulator without changing its mechanism**. I measured who the original market
-fails, picked the personas to build for, and added five opt-in features: four policies and a Policy Lab to compare them.
-**With every new feature off, a run is identical to the original, number for number.** A test checks this against an
-untouched copy of the original engine on three seeds.
+- **What I built:** I extended the BayWork simulator without changing its rules. With every new feature off, it gives exactly the original results.
+- **The five features:** Fair-Chance Slates, Warm Handoff, Bay Corridors, Retire-to-Mentor, and a Policy Lab that compares them persona by persona.
+- **Main result:** under the brief's 5% hiring cap, total hires barely move. The policies decide **who** waits for a job, not **how many** wait.
+- **Biggest wins:** new grads placed within 4 quarters 39% → 77%, and laid-off people 68% → 86%. Experienced job-seekers and job switchers pay for it, and I show that.
+- **See it in 3 minutes:** open `index.html` in Chrome and press **▶ 3-minute demo** at the top of the sidebar.
 
-> README.txt is the same document in plain text, generated from this file by `node tools/readme-txt.js`.
+BayWork simulates hiring, attrition, layoffs, graduations, retirements and pay across the Bay Area's engineering
+workforce, one quarter at a time. It models every engineer and manager individually: about 270,000 people.
+
+> README.txt is the same document in plain text (generated with `node tools/readme-txt.js`).
 
 ---
 
-## 1. Run it
+## 1. How to run it
 
 Open `index.html` in Chrome. There's no build step, no install and no network access; it works from `file://`.
 
-**See the improvements in under 3 minutes:**
-
-1. Press **▶ 3-minute demo** at the top of the sidebar. It loads the **All uplift** preset and runs the Policy Lab's
-   *Compare*: the original model against all four policies, same seed. Read the **Who gains / Who loses** lines.
-2. The sidebar's **Presets** load one feature at a time (**Original**, **All uplift**, **Fair-Chance**, **Warm Handoff**,
-   **Handoff, cap-exempt**, **Bay Corridors**, **Retire-to-Mentor**). "What to look at" under the presets lists where
+**The 3-minute tour**
+1. Press **▶ 3-minute demo**. It loads the **All uplift** preset (all four policies on) and compares it with the original
+   model in the Policy Lab, same seed. Read the **Who gains / Who loses** lines.
+2. Use the **Presets** in the sidebar to switch on one feature at a time. "What to look at" under the presets says where
    each feature shows up.
 
-The original controls are unchanged:
+**Original controls (unchanged):** Start/Stop (or <kbd>Space</kbd>), +1 quarter, speed, a zoomable map (click an HQ or
+a city), Raw data tables with CSV download, and an end-of-run Summary.
 
-- **Start / Stop**: the main button. <kbd>Space</kbd> also toggles.
-- **+1 quarter**: steps through one quarter at a time.
-- **Speed**: ½× to 8× (quarters per second).
-- **Map**: scroll to zoom, drag to pan, ⤢ to reset.
-  - Click an HQ for its org chart and hiring plan.
-  - Click a city for its residents.
-  - "Find a company" draws its commute shed: lines from where its people live to its HQ.
-- **Raw data**: every engineer, company, city and quarter as sortable, filterable tables with CSV download. Click any
-  row for detail, including an employee's career timeline.
-- **Summary**: opens at the end of the run. It explains five findings with the run's own numbers, each with a one-click
-  "Try".
-- Opening any detail view pauses the run so the numbers hold still.
-
-New in this version:
-
-- **Uplift features**: a new sidebar group. All features are off by default.
-- **Policy Lab** (top bar): a persona scorecard, *Compare* (baseline against your policy), stress tests and an
-  autopilot.
-- **Visibility** tab on the dashboard: who in the pool is being screened, and who actually gets offers.
+**New in this version**
+- **Uplift features**: a sidebar group. Every feature is off by default.
+- **Policy Lab** (top bar): a scorecard, baseline-vs-policy compare, stress tests and an autopilot.
+- **Visibility** tab on the dashboard: who is being screened, and who actually gets offers.
 - **Bay Corridors** bar under the map: draw or suggest shuttle corridors.
-- **New KPI cards**: "Re-employed same quarter" and "Mentors active" (or "Grad first-year quits").
+- **Two new KPI cards**: "Re-employed same quarter" and "Mentors active".
 
-**Tests and tools** (Node 18 or later, no dependencies):
+**Tests and tools** (Node 18 or later, no dependencies)
 
 ```
-node test/engine.test.js                 27 tests, about 2–3 minutes
-node tools/baseline.js                   persona metrics for one run (defaults: seed 42, 5 years, 200 companies)
-node tools/baseline.js '{"seed":7}'      any engine setting as JSON
-node tools/compare.js '{}' '{"fairScreening":1}'          reference vs. policy on seeds 42, 7, 123
-node tools/compare.js --small '{}' '{"warmHandoff":1}'    fast scale for tuning: 100 companies, 3 years, seeds 42, 7
-sh tools/final-tables.sh                 regenerates every table in this README (several minutes; output in tools/results/)
-node tools/headless.js                   loads index.html in headless Chrome from file://, clicks through, reports console errors
+node test/engine.test.js                 27 tests (about 2–3 minutes)
+node tools/baseline.js                   persona metrics for one run (seed 42, 5 years, 200 companies)
+node tools/compare.js '{}' '{"fairScreening":1}'          baseline vs. a policy on seeds 42, 7, 123
+node tools/compare.js --small '{}' '{"warmHandoff":1}'    fast scale: 100 companies, 3 years, seeds 42 and 7
+sh tools/final-tables.sh                 regenerates every table in this README (output in tools/results/)
+node tools/headless.js                   opens index.html in headless Chrome, clicks through it, reports console errors
 ```
 
 ---
 
-## 2. The diagnosis: what the original market does to each group
+## 2. The problem: what the original market does to each group
 
-Run: `node tools/compare.js '{}' '{"hireCapPct":8}' '{"slate":40}' '{"nearbyMiles":60}'`. That's 200 companies and
-5 years, as the mean of seeds 42, 7 and 123. The seeds agree to within about 1 point. Full output is in
-`tools/results/diagnosis.txt`.
+Command: `node tools/compare.js '{}' '{"hireCapPct":8}' '{"slate":40}' '{"nearbyMiles":60}'`, at 200 companies and
+5 years, averaged over seeds 42, 7 and 123. The seeds agree to within about 1 point.
 
-**Definition used everywhere: "placed within 4 quarters" (≤4Q)** = hired in the quarter the person started looking or in
-the 3 quarters after it. Only job searches with 4 full quarters of follow-up count. An earlier figure of 44% for new
-grads used a 5-quarter window (the entry quarter plus 4); on this stricter definition the same run gives 39.2%.
+**One definition used everywhere.** "Placed within 4 quarters" (≤4Q) means hired in the quarter the person started
+looking or in the next 3 quarters. Only job searches with 4 full quarters of follow-up count. An earlier figure of 44%
+for new grads used a 5-quarter window; on this stricter definition the same run gives 39.2%.
 
-| Persona | What happens with the original rules (defaults) | Why, in the code |
+| Group | What happens (default rules, 5 years) | Why |
 |---|---|---|
-| Everyone | Unemployment goes from **2.9% to 28.1%** in 5 years (8.5, 13.7, 18.7, 23.5 at each year end). | Backfills count toward the 5%-a-quarter hiring cap, while large companies lose about 23% of their people a year. |
-| Large companies | Headcount **−22.7%**. 43.7k reqs are unfilled at the end; most large companies end quarters at the cap. | The cap is the binding constraint: `hireCapPct 8` brings unemployment to 9.5%. |
-| New grads | Only **39.2% placed ≤4Q**, taking 3.1 quarters to be hired. 20k are still looking at the end. | `fill()` sorts each slate by experience, most experienced first. Grads are on slates but rarely get an offer. With `slate 40`, grads placed ≤4Q **collapse to 3.2%**. |
-| Job switchers | 60.5% placed ≤4Q. **50.7k are still looking at the end**, the biggest group in the pool. | Their ask carries years of 10% raises that a seat growing 2% a year can't meet. |
-| Laid off | 67.7% placed ≤4Q, but rehired at **74% of their old pay**. | They ask 20% less, which makes them easy to hire and leaves a pay scar. |
-| Long-term unemployed | **66%** of the final pool has been looking for 4+ quarters. | All of the above. |
-| Regions | The city unemployment gap (90th − 10th percentile city) is **21.2 points**: North Bay 45%, Tri-Valley 37%, South Bay 20%. | Acceptance halves every 15 miles of commute, most jobs are in the South Bay, and nobody moves. `nearbyMiles 60` shrinks the gap to 4.6 points **but cuts grads placed ≤4Q to 9.4%**, because distant experienced candidates now accept first. |
-| Retirees | 27.9k retire and simply leave. | Each retirement opens a backfill that competes for the same cap. |
+| Everyone | Unemployment rises from **2.9% to 28.1%**. | Replacing leavers counts toward the 5%-a-quarter hiring cap, but large companies lose about 23% of their people a year. |
+| Large companies | Headcount **−22.7%**; 43.7k jobs unfilled at the end. | The cap is the binding limit. Raising it to 8% brings unemployment to 9.5%. |
+| New grads | Only **39.2%** placed ≤4Q; 20k still looking at the end. | Recruiters offer jobs to the most experienced candidate first. With bigger slates (40), grads placed ≤4Q fall to **3.2%**. |
+| Job switchers | 60.5% placed ≤4Q; **50.7k still looking**, the biggest group. | Years of 10% raises push their asking pay above what a seat (growing 2% a year) can pay. |
+| Laid off | 67.7% placed ≤4Q, but rehired at **74% of their old pay**. | They ask 20% less, so they're hired quickly but cheaply. |
+| Long-term unemployed | **66%** of people looking have been looking 4+ quarters. | All of the above. |
+| Regions | The city unemployment gap is **21.2 points**: North Bay 45%, South Bay 20%. | The chance of accepting halves every 15 miles of commute, and most jobs are in the South Bay. |
+| Retirees | 27.9k retire and leave. | Each retirement opens a replacement job that competes for the same cap. |
 
-**What constrains every feature below: under the brief's cap, total hires are fixed at about 220k whatever else
-changes.** A feature that changes *who* is hired helps one group at the expense of another. Only something that keeps
-people employed, or that explicitly bypasses the cap (labelled as a policy lever), can lower overall unemployment much.
-I report the losing groups for every feature.
+(The "city gap" is the unemployment rate of the 90th-percentile city minus the 10th-percentile city, for cities with
+200+ engineers.)
+
+**What limits every feature:** under the cap, total hires stay at about 220k whatever else changes. So a feature that
+changes *who* gets hired helps one group at another's expense. I report the losing groups for every feature.
 
 ---
 
-## 3. Personas I optimised for, and why
+## 3. Who I built for, and why these features
 
-1. **New grads.** They're the worst-served group by placement rate, and the cause is mechanical: the offer order, not
-   their fit for the seat.
-2. **Laid-off engineers.** Tens of thousands are laid off while tens of thousands of reqs sit open at other companies.
-   They're hired back fast, but cheaply and through a lottery.
-3. **People in far-out regions** (North Bay, Tri-Valley), whose unemployment is about twice the South Bay's.
-4. **Retirees and the companies they leave**: the brief lists retirees as a group, but the original gives them no role.
-5. **Large companies and startups** as employers, measured by headcount against plan and by fill time.
+**Personas I optimised for**
+1. **New grads**: the worst placement rate, caused by the offer order rather than by their fit for the job.
+2. **Laid-off engineers**: tens of thousands laid off while tens of thousands of jobs sit open elsewhere.
+3. **People in far-out regions** (North Bay, Tri-Valley): unemployment about twice the South Bay's.
+4. **Retirees and the companies they leave**: the brief names retirees, but the original gives them no role.
+5. **Employers** (large companies and startups): headcount against plan, and fill time.
 
-**Job switchers and experienced (10y+) candidates are tracked as personas too**, mostly because they're **the groups
-who pay** for some of these features. A policy that only reports its winners isn't honest about a capped market.
+I also track **job switchers** and **experienced (10+ years) candidates**, because they're the groups that pay for some of
+these features.
+
+**Why these features.** I chose Fair-Chance Slates, Warm Handoff, Bay Corridors, Retire-to-Mentor and the Policy Lab
+because they change *how the market works*:
+- who is seen by recruiters;
+- where laid-off people go;
+- who stays in work;
+- how a policy is judged.
+
+Adjusting a single number such as the hiring cap or the slate size is easy and common, and the diagnosis already shows
+what it does. These features are new mechanisms that sit on top of the original rules. The results below show where they
+work well (grads, laid-off people) and where they don't (corridors and regional unemployment).
+
+**How every feature was built.** Each feature was tested and compared against the baseline *before* I integrated it:
+1. I added tests for its rules.
+2. I compared it with the baseline at small scale (100 companies, 3 years, seeds 42 and 7), in at most two tuning rounds.
+3. I fixed the design.
+4. I re-measured it at full scale (200 companies, 5 years, seeds 42, 7 and 123) for the tables below.
+
+Every feature is off by default and uses no random draws when off. So the original runs are reproduced exactly; a test
+checks this against an untouched copy of the original engine.
 
 ---
 
 ## 4. The five features
 
-All four policies are opt-in settings in the **Uplift features** sidebar group, plus one third constructor argument for
-corridors. Each one changes only **who is screened, where people go, or adds an explicit, labelled policy lever**. None
-changes the acceptance formula `P = 75% × (offer ÷ ask)^4 × ½^(miles ÷ 15)`, the offer rule `offer = min(ask, band)`,
-the 5% hiring cap, or any other rule from the brief.
+None of the features changes the acceptance formula `P = 75% × (offer ÷ ask)^4 × ½^(miles ÷ 15)`, the offer rule
+(offer = the candidate's ask, capped at the seat's pay band), or the 5% hiring cap. Each one changes only who is
+screened, where people go, or adds a clearly labelled policy lever.
 
-Every table below is at full scale (200 companies, 5 years), as the mean of seeds 42, 7 and 123, with the change for each
-seed in brackets. "NET placed ≤4Q" adds the three pool cohorts together. If it stays flat while the group rows move in
-opposite directions, the feature only moves jobs between groups.
+In the tables, "NET placed ≤4Q" adds new grads, laid-off people and job switchers together. If it stays flat while the
+group rows move in opposite directions, the feature moves jobs between groups rather than adding jobs.
 
-### Feature 1 — Fair-Chance Slates (screening by fit, plus a visibility audit)
+### Feature 1 — Fair-Chance Slates
 
-**Problem.** Being screened isn't the bottleneck. At the end of a default run only about 3% of the pool has been left off
-every slate for 4 quarters. But **55% of new grads looking for work have had no offer in 4 quarters**, against 11–16%
-of others. Recruiters work down each slate from the most experienced candidate, and the first acceptance ends the search.
+**Problem.** Almost everyone looking for work is screened: only about 3% were left off every slate for 4 quarters. But
+**55% of new grads had no job offer in 4 quarters**, against 11–16% of others. Recruiters work down each slate from the
+most experienced candidate, and stop at the first acceptance.
 
-**Mechanism.**
-- **Visibility audit (always on, bookkeeping only).** Every person records how many slates they land on and how many
-  offers reach them. The **Visibility** tab breaks down "no offer in 4 quarters" and "not on any slate" by status, by time
-  looking and by region, with the Gini of offers and of screenings. The city tooltip shows the same counts.
-- **Fit ranking (`fairScreening`).** Offers go first to the candidate most likely to accept *this* seat, using pay fit
-  `(offer ÷ ask)^4` from the unchanged formula. Near-ties go to the cheaper offer, then the closer level, then the
-  smaller surplus of experience over what the seat needs. A small boost for time spent looking (`fairIdleBoostPct`,
-  +30% at 8+ idle quarters) softens the cost to switchers and startups.
-- **Rotation (`fairRotation`)** reserves 20% of each slate for the longest-idle eligible candidates.
+**What it does**
+- **Visibility audit** (always on, bookkeeping only). It counts how often each person is screened and how often they get
+  an offer. The new **Visibility** tab shows "no offer in 4 quarters" by status, time looking and region.
+- **Fit ranking** (`fairScreening`). It offers first to the candidate whose asking pay the seat can best meet. It uses
+  the pay part of the unchanged acceptance formula, plus a small boost for time spent looking (`fairIdleBoostPct`, up to
+  +30%).
+- **Rotation** (`fairRotation`, off). It reserves 20% of each slate for the longest-idle people. It's kept only for
+  comparison.
 
-**Rules touched.** Only the order of the slate in `fill()` (and, with rotation, which candidates are on it). The offer,
-the acceptance formula and the cap are unchanged.
+**What it changes in the engine:** only the order of offers in `fill()`. The offer and the acceptance formula are
+unchanged.
 
-**How I chose the ranking (2 rounds at 100 companies, 3 years).**
-- *P(accept) including commute:* grads +34pt, but the **regional gap widens 9 points**. Distance gets counted twice:
-  closer people are ranked first *and* accept more often.
-- *Pay fit only:* grads +44pt, the gap **narrows** 4.6 points, but startups −12pt.
-- *Pay fit plus idle boost (shipped):* grads +38pt, gap −5.2 points, startups −6.7pt.
-- *Rotation* on its own **made things worse**: NET −6.5k. Long-idle people are already on slates, and they're the least
-  likely to accept. It's kept as a toggle, labelled that way.
+**Key results** (full scale, 3 seeds)
 
-`node tools/compare.js '{}' '{"fairScreening":1}' '{"fairScreening":1,"fairRankDistance":1,"fairIdleBoostPct":0}' '{"fairRotation":1}'`
+| Measure | Baseline | Fair-Chance | Change |
+|---|---:|---:|---:|
+| New grads placed ≤4Q | 39.2% | 76.5% | **+37.3 pts** |
+| City unemployment gap | 21.2% | 14.2% | **−6.9 pts** |
+| Unemployment | 28.1% | 27.6% | −0.5 pts |
+| Experienced 10y+ placed ≤4Q | 61.4% | 33.6% | **−27.8 pts** |
+| Job switchers placed ≤4Q | 60.5% | 50.8% | −9.7 pts |
+| NET placed ≤4Q (share) | 59.5% | 56.3% | −3.2 pts |
+
+<details><summary>Full table (all metrics, per-seed changes)</summary>
+
+Command: `node tools/compare.js '{}' '{"fairScreening":1}' '{"fairScreening":1,"fairRankDistance":1,"fairIdleBoostPct":0}' '{"fairRotation":1}'`
 
 | Metric | Baseline | Fair-Chance (shipped) | Δ vs baseline (seeds 42 / 7 / 123) | Fit incl. commute | Δ vs baseline (seeds 42 / 7 / 123) | Rotation only | Δ vs baseline (seeds 42 / 7 / 123) |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -165,51 +171,61 @@ the acceptance formula and the cap are unchanged.
 | City unemployment gap p90−p10 | 21.2% | 14.2% | −6.9pt <sub>(−7.7pt −6.9pt −6.3pt)</sub> | 34.5% | +13.3pt <sub>(+13.0pt +12.9pt +14.0pt)</sub> | 19.3% | −1.9pt <sub>(−1.9pt −1.9pt −2.0pt)</sub> |
 | Total hires | 220,168 | 220,432 | +264 <sub>(−5 +243 +553)</sub> | 220,405 | +237 <sub>(−77 +76 +711)</sub> | 219,840 | −329 <sub>(−715 +34 −305)</sub> |
 
-**Result.** Fair-Chance does what it was built for. **New grads placed ≤4Q go from 39% to 77% (+37 points)**, and
-their wait halves (3.1 → 1.6 quarters). The **regional gap narrows 6.9 points**, the long-term-unemployed share falls
-3.6 points, and unemployment falls 0.5 points. Every seed agrees.
+</details>
 
-**The bill.** The cap fixes total hires, so other groups pay:
-- **experienced 10y+ candidates −28 points** placed ≤4Q;
-- switchers −9.7 points;
-- laid-off people −6.9 points;
-- startups −4.9 points of headcount.
+**How I tested it**
+- **Tests:**
+  - *"all uplift features off: identical to the original engine (seeds 42, 7, 123)"* compares every quarterly output with
+    the original engine.
+  - *"Fair-Chance: books, band and cap hold every quarter"* checks that every list stays consistent, no new hire is paid
+    above band, and no company exceeds its cap.
+  - *"Fair-Chance: new-grad placement within 4 quarters is not worse on average"* takes the mean over seeds 42, 7 and 123.
+  - *"visibility: per-spell counts and shares stay in range"*.
+- **Tuning (small scale, seeds 42 and 7):**
+  - Ranking by full P(accept), *including* commute: grads +33.7 pts, but the city gap +9.0 pts.
+  - Pay fit only: grads +43.6, gap −4.6, startups −12.0.
+  - Pay fit plus the idle boost: grads +38.1, gap −5.2, startups −6.7, switchers −6.8.
+  - Rotation alone, at full scale: NET −6.5k placements.
+- **Full scale (seeds 42, 7, 123):** the table above. All seeds agree in sign.
+- **Decision:**
+  - **Kept pay fit plus the idle boost.** It helps grads *and* the worst-off regions.
+  - Kept the commute-weighted version as an off-by-default toggle. It has a better NET (+2.0 pts) but widens the city
+    gap by 13.3 pts.
+  - Kept rotation only as a labelled comparison.
+  - The cost to experienced candidates is labelled in the UI.
 
-NET placements ≤4Q fall 3.2 points. Grads are placed fast, and everyone else waits longer. The variant that ranks by full
-P(accept) *including commute* shows the trade-off clearly. It does better on NET (+2.0 points) and hurts experienced
-candidates less (−19), but **widens the regional gap by 13 points**. I shipped the pay-fit ranking because it helps both
-grads and the worst-off regions. The commute-weighted version is one toggle away (`fairRankDistance`). Rotation alone
-helps nobody.
+**See it:** choose the **Fair-Chance** preset, open the **Visibility** tab, and step a few quarters.
 
-**Verdict:** a strong, targeted gain for new grads and lagging regions. It's paid for mostly by experienced job-seekers,
-and that's labelled in the UI.
+### Feature 2 — Warm Handoff
 
-**See it in the app.** Choose the **Fair-Chance** preset, open the **Visibility** tab, and step a few quarters. Then use
-the Policy Lab's *Compare*.
+**Problem.** About 58k people are laid off over 5 years. They join a pool of about 80k where hiring is a lottery, while
+about 40k jobs are open at other companies.
 
-### Feature 2 — Warm Handoff (layoff → same-quarter redeployment)
+**What it does** (`warmHandoff`)
+- Layoffs happen exactly as before.
+- In the same quarter, *before general hiring*, each laid-off person is offered the best open job at another company:
+  - the HQ is within 25 miles of their old HQ;
+  - the job is at their level or one up;
+  - "best" means the highest chance of acceptance under the unchanged formula;
+  - they get up to 3 offers.
+- If they accept, they're employed again with no time out of work. The timeline shows "Redeployed".
+- By default **handoff hires count toward the receiving company's 5% cap** (`handoffCountsTowardCap = 1`), which is the
+  brief's rule. Setting it to 0 is a labelled **policy lever** that lets redeployment bypass the cap.
 
-**Problem.** About 58k people are laid off over 5 years. In each layoff quarter they fall into a pool of about 80k where
-hiring is a lottery, while about 40k reqs sit open at other companies.
+**Key results** (full scale, 3 seeds)
 
-**Mechanism (`warmHandoff`).** People are laid off exactly as before: same victims, same events, same 20% discount on
-their ask. Then, **after growth planning and before general hiring in the same quarter**, each laid-off person (in layoff
-order) is offered the best open seat at another company:
-- the receiving HQ is within `handoffRadiusMiles` (25) of the old HQ;
-- the seat is at their own level or one up;
-- "best" means the highest P(accept) under the unchanged formula and offer rule;
-- they get up to 3 offers, with one random draw each.
+| Measure | Baseline | Warm Handoff | Change |
+|---|---:|---:|---:|
+| Laid off placed ≤4Q | 67.7% | 86.2% | **+18.4 pts** |
+| Laid off: quarters to rehire | 1.98 | 0.76 | **−1.22** |
+| Laid off: rehired at % of old pay | 74.1% | 77.9% | +3.8 pts |
+| Job switchers placed ≤4Q | 60.5% | 54.8% | −5.7 pts |
+| Unemployment | 28.1% | 28.3% | +0.1 pts |
+| Unemployment, *cap-exempt lever* | 28.1% | 19.8% | −8.4 pts |
 
-A placed person goes straight to employed with zero idle quarters, and the event log shows **"Redeployed (warm
-handoff)"**. Frozen companies and the startup max are respected. `handoffSharePct` limits how many of each company's
-laid-off people are offered a handoff.
+<details><summary>Full table (all metrics, per-seed changes)</summary>
 
-**Rules touched.** None by default: **`handoffCountsTowardCap = 1` (the default) counts handoff hires against the
-receiving company's 5% cap**, which is fixed before the handoff runs, exactly as general hiring would fix it.
-`handoffCountsTowardCap = 0` is an explicit **policy lever** that lets redeployment bypass the cap. It's measured
-separately and labelled that way everywhere.
-
-`node tools/compare.js '{}' '{"warmHandoff":1}' '{"warmHandoff":1,"handoffCountsTowardCap":0}'`
+Command: `node tools/compare.js '{}' '{"warmHandoff":1}' '{"warmHandoff":1,"handoffCountsTowardCap":0}'`
 
 | Metric | Baseline | Warm Handoff (cap counts) | Δ vs baseline (seeds 42 / 7 / 123) | Cap-exempt lever | Δ vs baseline (seeds 42 / 7 / 123) |
 |---|---:|---:|---:|---:|---:|
@@ -230,60 +246,56 @@ separately and labelled that way everywhere.
 | City unemployment gap p90−p10 | 21.2% | 21.3% | +0.1pt <sub>(−0.2pt −0.7pt +1.2pt)</sub> | 19.3% | −1.9pt <sub>(−2.9pt −1.6pt −1.1pt)</sub> |
 | Total hires | 220,168 | 219,907 | −261 <sub>(−560 −79 −144)</sub> | 257,407 | +37,238 <sub>(+37,146 +37,042 +37,527)</sub> |
 
-**Result (cap counts, the brief's rule).** For laid-off people it's a clear gain:
-- **placed ≤4Q +18 points** (68% → 86%);
-- **wait 2.0 → 0.8 quarters**;
-- **rehired at 78% of their old pay instead of 74%** (+3.8 points). They're placed before their ask decays.
+</details>
 
-Overall it's **almost zero-sum**. Unemployment doesn't change (+0.1 points) and NET placements rise only +0.4 points,
-because the seats laid-off people take are seats switchers (−5.7 points) and experienced candidates (−2.4 points) would
-have filled. As expected, **the effect on the whole market is modest when the cap counts**. What the handoff changes is
-*who* waits, and the pay scar.
+**How I tested it**
+- **Tests:**
+  - *"Warm Handoff: books, band, cap and startup max hold; redeployed people never sit idle"* checks every quarter: lists
+    stay consistent, no redeployed person is paid above band or has idle quarters, no company exceeds its cap, and no
+    startup exceeds 25 people.
+  - *"Warm Handoff: cap-exempt lever hires more than the faithful reading"*.
+  - The identical-to-original test covers the off state.
+- **Small scale (seeds 42 and 7):** laid off +11.7 pts and switchers −4.7 pts with the cap counting; unemployment −5.1 pts
+  with the cap-exempt lever. One round was enough.
+- **Full scale (seeds 42, 7, 123):** the table above.
+- **Decision:**
+  - **Kept the cap-counting default.** It's a real gain for laid-off people, but almost zero-sum overall: the jobs they
+    take would have gone to switchers.
+  - The cap-exempt version cuts unemployment by 8.4 pts only because it adds hires the cap would forbid, so it's labelled
+    as a policy lever.
 
-**Result (cap-exempt lever).** Unemployment **28.1% → 19.8% (−8.4 points)**, NET +39k placements, every pool cohort
-better off, and large companies −22.7% → −13.6%. That's because it adds 37k hires the cap would otherwise forbid. It's a
-policy choice (for example, a redeployment programme exempt from hiring freezes), not a free improvement, and it's
-labelled that way.
+**See it:** choose the **Warm Handoff** preset and press **+1 quarter**. Aqua arcs on the map go from the old HQ to the
+new HQ.
 
-**See it in the app.** Choose the **Warm Handoff** preset and press **+1 quarter** (the first quarter is a layoff
-quarter):
-- aqua arcs on the map go from the old HQ to the new HQ;
-- the "Re-employed same quarter" card fills in;
-- *Flows → Who got hired* shows a "Redeployed" series.
+### Feature 3 — Bay Corridors
 
-### Feature 3 — Bay Corridors (draw shuttle lines on the map)
+**Problem.** The city unemployment gap is about 21 points. Most jobs are in the South Bay, and acceptance halves every 15
+miles of commute.
 
-**Problem.** The regional gap is about 21 points. Most open seats are in the South Bay, acceptance halves every 15 miles
-of commute, and nobody moves.
-
-**Mechanism.** A corridor `{ from, to, cutPct = 40, spillMiles = 8 }` cuts the effective commute miles between a home
-city (and its neighbours within 8 miles) and a job city by 40%. It's symmetric, never goes below the 3-mile same-city
-floor, and only ever shortens a distance. Corridors are passed as a third constructor argument, because
-`normalizeConfig` keeps only numeric settings. With no corridors the distance table is untouched.
+**What it does.** A corridor (a shuttle line plus a hub) cuts the effective commute between a home city (and its
+neighbours within 8 miles) and a job city by 40%. It only shortens distances, never below 3 miles, and it's symmetric.
 
 In the app:
 - **Draw corridor**: click a home city, then a job city.
-- **Suggest 3**: proposes the home → job city pairs with the most people looking (weighted by local unemployment) against
-  open seats, where a corridor would most raise acceptance. It's computed from the current run.
-- Corridors lock during a run, like the other settings.
+- **Suggest 3**: proposes the city pairs where a corridor would most raise acceptance for people looking for work.
 
-The bar under the map shows:
-- **cost per quarter** (*assumption*: $250k per corridor);
-- **commute hours per week** (*assumption*: 2 trips a day, 5 days a week, 30 mph);
-- **CO₂ per quarter** (*assumption*: 0.4 kg per vehicle mile);
-- the **city gap**.
+The bar under the map shows the corridor cost, commute hours per week and CO₂, all marked *assumed*.
 
-Commute hours and CO₂ are shown both with the corridors and for the same people on the original distances.
+**What it changes in the engine:** the table of commute distances only.
 
-**Rules touched.** The distance table only. The acceptance formula is unchanged, so corridors reduce friction rather
-than override the rule.
+**Key results** (full scale, 3 seeds; the 3 corridors suggested at the start of a run)
 
-**How I chose the suggestions (2 rounds).** Ranking by the *number* of people looking picks the big cities (SF,
-San Jose and Oakland to Mountain View). Weighting by the local unemployment *rate* changes nothing at the start of a run,
-because everyone starts at 3%. The regional gap only develops over time, so suggestions are best made **after** a run.
-The table uses the suggestions available at the start of a run, which is the conservative case.
+| Measure | Baseline | Corridors | Change |
+|---|---:|---:|---:|
+| Average commute | 21.8 mi | 20.5 mi | **−1.3 mi** |
+| City unemployment gap | 21.2% | 21.5% | +0.3 pts |
+| New grads placed ≤4Q | 39.2% | 36.5% | −2.6 pts |
+| Unemployment | 28.1% | 28.3% | +0.1 pts |
+| City gap, corridors + Fair-Chance | 21.2% | 14.2% | −7.0 pts |
 
-`node tools/compare.js '{}' '{"corridors":"suggest"}' '{"corridors":"suggest","fairScreening":1}'`
+<details><summary>Full table (all metrics, per-seed changes)</summary>
+
+Command: `node tools/compare.js '{}' '{"corridors":"suggest"}' '{"corridors":"suggest","fairScreening":1}'`
 
 | Metric | Baseline | 3 suggested corridors | Δ vs baseline (seeds 42 / 7 / 123) | Corridors + Fair-Chance | Δ vs baseline (seeds 42 / 7 / 123) |
 |---|---:|---:|---:|---:|---:|
@@ -304,47 +316,47 @@ The table uses the suggestions available at the start of a run, which is the con
 | City unemployment gap p90−p10 | 21.2% | 21.5% | +0.3pt <sub>(+0.3pt −0.3pt +0.8pt)</sub> | 14.2% | −7.0pt <sub>(−8.0pt −7.2pt −5.7pt)</sub> |
 | Total hires | 220,168 | 220,066 | −102 <sub>(−220 −209 +123)</sub> | 220,492 | +324 <sub>(−88 +251 +808)</sub> |
 
-**Result: this feature did not measurably help the group it targets.** The three corridors suggested at the start of a
-default run are San Jose → San Francisco, San Francisco → Mountain View and Oakland → Mountain View. They cut the
-average commute by **1.3 miles** (6%), with commute hours and CO₂ falling in proportion. But the **regional
-unemployment gap doesn't move** (+0.3 points, with mixed signs across seeds), overall unemployment doesn't move, and
-**new grads lose 2.6 points**: experienced candidates further away now accept first, the same effect as `nearbyMiles 60`
-in the diagnosis.
+</details>
 
-Combined with Fair-Chance, the gap closes 7.0 points. That's the same as Fair-Chance alone (−6.9), so the corridors add
-commute savings, not regional fairness.
+**How I tested it**
+- **Tests:** *"Bay Corridors: only shorten distances, never below 3 miles, stay symmetric; none = original"* checks every
+  city pair, that invalid corridors are dropped, the suggestions, and that the books stay consistent after a full run.
+- **Small scale, round 1 (seeds 42 and 7):** suggestions by the number of people looking picked SF, San Jose and Oakland →
+  Mountain View. Commute −1.1 mi, gap unchanged, grads −2.1 pts.
+- **Round 2:** I weighted home cities by unemployment rate. It picked the same lines at the start of a run, because every
+  city starts at 3%. Lines suggested from the *end* of a run (including Concord) gave gap −1.2 pts and commute −0.9 mi.
+- **Full scale (seeds 42, 7, 123):** the table above.
+- **Decision:** this feature **did not measurably narrow the regional gap**. With Fair-Chance the gap closes 7.0 pts, the
+  same as Fair-Chance alone. I kept it as a commute and emissions tool, labelled with its measured result in the UI. I
+  don't claim it fixes regional unemployment.
 
-My reading: a few corridors into the South Bay mostly help people who were already close to being hired. The
-hardest-hit cities (North Bay, Tri-Valley) are on no suggested line at the start of a run, because their unemployment
-hasn't built up yet. Drawing corridors from those cities is one click in the app, but **I haven't measured it**, and I
-don't claim it works.
+**See it:** choose the **Bay Corridors** preset (purple lines), or draw your own.
 
-**Verdict:** shipped as a commute and emissions tool with honest numbers, and as a way to test corridor ideas in the Lab.
-It's not a fix for regional unemployment.
+### Feature 4 — Retire-to-Mentor
 
-**See it in the app.** Choose the **Bay Corridors** preset (purple lines), or draw your own. Watch the bar under the map,
-then use the Policy Lab's *Compare*.
+**Problem.** About 2% of the workforce retires each year, the most experienced first. Each retirement removes an expert
+at once and opens a replacement job that competes for the 5% cap.
 
-### Feature 4 — Retire-to-Mentor (phased retirement)
+**What it does**
+- When an employed person is chosen to retire, with probability `mentorSharePct` they first stay **4 quarters as a
+  mentor**, keeping their seat (so no replacement job opens yet). Then they retire normally.
+- Mentors don't quit, aren't laid off and aren't promoted. They're counted as retired only when they actually retire.
+- An **assumption** (`mentorAttritionCut`, 30%): new grads hired where a mentor works quit 30% less often in their first
+  year.
 
-**Problem.** About 2% of the workforce retires each year, the most experienced first. Each retirement removes an
-experienced person at once and opens a backfill that competes for the 5% cap.
+**Key results** (full scale, 3 seeds, half of retirees mentor)
 
-**Mechanism (`mentorSharePct`, `mentorQuarters`).** When an *employed* person is selected to retire, with probability
-`mentorSharePct` they keep their seat as a **mentor** for `mentorQuarters` (4). So no backfill opens yet. Then they retire
-for real through the normal path: backfill, retired status and event. Details:
-- People in the pool who are selected retire as before.
-- A selected mentor uses up that quarter's retirement draw, and is counted as retired only when they actually retire.
-- Mentors are exempt from quitting, layoffs, promotion and being selected again.
-- The timeline shows "Became a mentor".
+| Measure | Baseline | Mentor 50% | Change |
+|---|---:|---:|---:|
+| Unemployment | 28.1% | 27.2% | **−0.9 pts** |
+| Large-company headcount change | −22.7% | −21.0% | +1.7 pts |
+| Total hires | 220,168 | 223,156 | +2,988 |
+| Open replacement jobs at end | 36,447 | 33,440 | −3,007 |
+| Grad first-year quit rate | 14.1% | 10.2% | −3.9 pts (13.9% with cut = 0) |
 
-**The assumed effect (`mentorAttritionCut`, default 30%, an ASSUMPTION).** New grads hired by a company that currently has
-a mentor have their quit probability cut by 30% for their first 4 quarters.
+<details><summary>Full table (all metrics, per-seed changes)</summary>
 
-**Rules touched.** Retirement *timing* for the mentoring share, and (by assumption) the quit rate of mentored grads. The
-retirement rate and the cap are unchanged.
-
-`node tools/compare.js '{}' '{"mentorSharePct":50}' '{"mentorSharePct":50,"mentorAttritionCut":0}'`
+Command: `node tools/compare.js '{}' '{"mentorSharePct":50}' '{"mentorSharePct":50,"mentorAttritionCut":0}'`
 
 | Metric | Baseline | Mentor 50% | Δ vs baseline (seeds 42 / 7 / 123) | Mentor 50% with cut 0 (structural only) | Δ vs baseline (seeds 42 / 7 / 123) |
 |---|---:|---:|---:|---:|---:|
@@ -363,65 +375,69 @@ retirement rate and the cap are unchanged.
 | Open backfill reqs at end | 36,447 | 33,440 | −3,007 <sub>(−2,998 −2,489 −3,533)</sub> | 34,152 | −2,295 <sub>(−2,309 −2,155 −2,421)</sub> |
 | Total hires | 220,168 | 223,156 | +2,988 <sub>(+2,777 +2,969 +3,218)</sub> | 222,853 | +2,684 <sub>(+2,429 +2,874 +2,750)</sub> |
 
-**Result.** Mentoring half of all retirees gives:
-- unemployment **−0.9 points**;
-- **+3k hires**;
-- large companies −22.7% → −21.0%;
-- 3k fewer open backfill reqs;
-- a small gain for every pool cohort (grads +1.7 points placed ≤4Q, laid off +0.8, switchers +0.7);
-- grad first-year quits 14.1% → 10.2%.
+</details>
 
-Nobody loses except startups (−0.7 points, mixed signs across seeds). Retirements in the 5-year window are 2.1k lower
-only because of timing. Retired plus still mentoring at the end is unchanged (+174), so the retirement rate is intact.
+**How I tested it**
+- **Tests:**
+  - *"Retire-to-Mentor: mentors keep their seat, are never double-counted, and retire on schedule"* checks every quarter:
+    mentors stay employed, per-company mentor counts match, nobody becomes a mentor or retires twice, no mentor quits or
+    is laid off or promoted, every mentor retires exactly on schedule, and retirements are counted once.
+  - *"Retire-to-Mentor: with the attrition cut at 0, grad quits are unchanged within noise"*.
+- **Small scale (seeds 42 and 7):** unemployment −0.8 pts and grad quits −3.9 pts. With the assumed cut set to 0:
+  unemployment −0.7 pts and grad quits −0.3 pts.
+- **Full scale (seeds 42, 7, 123):** the table above. Retirements within the 5 years are 2.1k lower only because of timing;
+  "retired + still mentoring" is unchanged.
+- **Decision:**
+  - The **grad-retention gain comes almost entirely from my assumption**, and the UI says so.
+  - **Roughly two-thirds to 90% of the headcount and unemployment gains are structural.** They remain with the cut at 0,
+    because mentors keep their seat and free up the cap.
+  - Kept, with that labelling.
 
-**How much is my assumption?** I re-ran with the assumed quit cut set to 0:
-- **The grad-retention gain is almost entirely the assumption.** First-year quits fall −3.9 points with the 30% cut and
-  −0.1 points without it.
-- **About 70–85% of the headcount and unemployment gains are structural** and remain at a cut of 0: unemployment −0.6 of
-  −0.9 points, large companies +1.4 of +1.7, hires +2.7k of +3.0k, backfill reqs −2.3k of −3.0k.
+**See it:** choose the **Retire-to-Mentor** preset and watch the "Mentors active" card.
 
-The structural mechanism: a mentor keeps their seat about a year longer, so their backfill doesn't compete for the 5% cap
-and the cap goes to other hires. Grad retention through mentoring should therefore be read as *what would follow if
-mentoring cut quits by 30%*, not as a finding. The UI says so next to the setting.
+### Feature 5 — Policy Lab
 
-**See it in the app.** Choose the **Retire-to-Mentor** preset. The "Mentors active" card shows mentors, and grad
-first-year quits with and without a mentor.
+**What it does.** A new window (Policy Lab button in the top bar) with four tabs:
+1. **Scorecard.** Ten persona rows, each scored 0–100 from one or two metrics, with adjustable weights feeding one overall
+   score. The scales are heuristic and documented in `js/metrics.js`.
+2. **Compare.** Runs the same seed twice: *Baseline* (all uplift features off) against *Your policy*. It shows persona
+   changes in green and red, **Who gains / Who loses**, and every metric. The runs proceed in small steps with a progress
+   bar, so the page never freezes. The baseline is cached.
+3. **Stress tests.** A recession (layoffs ×2, growth frozen) or a hiring boom (growth ×2, cap ×1.5) in year 2, applied
+   to both runs. The multipliers are **assumptions**. It reports whether the policy still helps.
+4. **Autopilot.** Tries a fixed grid of 12 policy mixes on a smaller model (60 companies, 3 years), scores them with your
+   weights, and shows the top 3. **Apply this policy** copies one into the sidebar. It says plainly that it's a small grid
+   search on a smaller model.
 
-### Feature 5 — Policy Lab (how the other four are seen)
+A full default run takes several seconds in the browser, so Compare and Stress default to a **Quick** scale (100
+companies, 3 years); full scale is one click.
 
-A new overlay (`js/ui/lab.js`), opened from **Policy Lab** in the top bar, with four tabs:
-
-1. **Scorecard.** Ten persona rows for the current run, each with a 0–100 score from one or two metrics, a bar and the
-   numbers behind it: new grads, laid off, job switchers, experienced 10y+, long-term unemployed, large companies,
-   startups, retirees & mentors, regions and commuters. **Weights** (0–3×) feed one overall score and apply in every
-   tab. The score scales are heuristic and documented in `js/metrics.js`; they aren't a welfare measure.
-2. **Compare.** Runs the same seed and settings twice:
-   - *Baseline*: every uplift feature forced off, no corridors.
-   - *Your policy*: your sidebar settings.
-
-   Runs are chunked into about 30 ms slices on `setTimeout`, with a progress bar and Cancel, so the page never freezes.
-   Web Workers don't run from `file://`. The baseline is cached per configuration. Results show persona deltas in green
-   and red, a **Who gains / Who loses** line, the **sum of persona changes**, and every metric.
-3. **Stress tests.** Engine setting `shock`: 1 is a recession (layoff rates ×2, funded growth frozen) and 2 is a hiring
-   boom (funded growth ×2, cap ×1.5). The window is quarters 5–8 by default. The **multipliers are assumptions**. One click
-   compares baseline and policy under the shock and says whether the policy still helps.
-4. **Autopilot.** A fixed grid of 12 policy combinations (feature toggles and a few levels) runs on a **smaller model**
-   (60 companies, 3 years, your seed). Each is scored with your weights, and the top 3 are shown with their persona deltas.
-   **Apply this policy** copies one into the sidebar. It's cancellable, shows progress, and says plainly that it's a
-   small grid search on a smaller model.
-
-**Runtime (measured in headless Chrome on the development laptop, which also had other Chrome windows busy).**
-- One full default run (200 companies, 5 years): **5–15 s**.
-- So Compare and Stress default to **Quick** scale (100 companies, 3 years), about **4–10 s** per compare. Full scale is
-  one click.
-- The autopilot at 60 companies and 3 years takes about **11–20 s** for all 12 policies plus a baseline.
-
-The persona metrics live in **one file**, `js/metrics.js`, wrapped so the browser and Node use the same code. A test
-checks that the tools and the page agree.
+**How I tested it**
+- **Tests:**
+  - *"stress tests: shock off is the original; a recession doubles layoffs only in its window"* also checks that a boom
+    hires more without breaking the raised cap.
+  - *"metrics: one implementation for browser and tools; compare runs are deterministic"*. The page and the Node tools
+    give identical metrics, the same seed gives identical results, and scores stay within 0–100.
+- **In the browser** (headless Chrome, `tools/headless.js`):
+  - Quick compare: 9.5 s. Recession test: 7.3 s. Autopilot: 11.2 s.
+  - The 3-minute demo: 4.4 s.
+  - Each preset changes the run as expected, and the console is clean.
+- **Decision:** I made Quick the default scale so a comparison takes seconds, and kept full scale one click away.
 
 ### All four together
 
-`node tools/compare.js '{}' '{"fairScreening":1,"warmHandoff":1,"mentorSharePct":50,"corridors":"suggest"}' '{…same…,"handoffCountsTowardCap":0}'`
+| Measure | Baseline | All four (cap counts) | With cap-exempt handoff |
+|---|---:|---:|---:|
+| New grads placed ≤4Q | 39.2% | 74.9% | 91.3% |
+| Laid off placed ≤4Q | 67.7% | 88.0% | 92.1% |
+| Experienced 10y+ placed ≤4Q | 61.4% | 38.6% | 48.8% |
+| Job switchers placed ≤4Q | 60.5% | 46.0% | 61.2% |
+| Unemployment | 28.1% | 26.6% | 18.4% |
+| City unemployment gap | 21.2% | 16.1% | 12.5% |
+
+<details><summary>Full table (all metrics, per-seed changes)</summary>
+
+Command: `node tools/compare.js '{}' '{"fairScreening":1,"warmHandoff":1,"mentorSharePct":50,"corridors":"suggest"}' '{…same…,"handoffCountsTowardCap":0}'`
 
 | Metric | Baseline | All four (cap counts) | Δ vs baseline (seeds 42 / 7 / 123) | All four with cap-exempt handoff | Δ vs baseline (seeds 42 / 7 / 123) |
 |---|---:|---:|---:|---:|---:|
@@ -444,185 +460,156 @@ checks that the tools and the page agree.
 | Grad hires: first-year quit rate | 14.1% | 9.9% | −4.2pt <sub>(−4.4pt −4.0pt −4.1pt)</sub> | 9.9% | −4.1pt <sub>(−4.6pt −3.9pt −3.9pt)</sub> |
 | Total hires | 220,168 | 223,458 | +3,290 <sub>(+2,804 +3,657 +3,409)</sub> | 259,415 | +39,247 <sub>(+38,928 +39,018 +39,795)</sub> |
 
-**With all four on and the brief's cap respected**, the gains and costs add up roughly as you'd expect:
-- **new grads +36 points** placed ≤4Q;
-- **laid off +20 points**;
-- unemployment −1.6 points;
-- regional gap −5.1 points;
-- commute −1.8 miles;
-- grad first-year quits −4.2 points (assumption-driven).
+</details>
 
-**Experienced 10y+ candidates (−23 points), switchers (−15) and startups (−6) pay for it**, and NET placements are flat
-(−0.3 points). It's a *redistribution* towards the groups the original market served worst.
+**With the brief's cap respected**, the policies move jobs towards the groups the original market served worst: grads
++36 pts, laid off +20 pts, city gap −5.1 pts. Experienced candidates (−23), switchers (−15) and startups (−6) pay for it,
+and NET placements are flat (−0.3 pts).
 
-**With the cap-exempt handoff lever as well**, unemployment falls 28.1% → 18.4% and switchers come back to even. Only
-experienced candidates (−13) and startups (−8.5) are still worse off. That's the honest headline: under the brief's cap,
-these policies decide *who* waits; only changing the cap decides *how many*.
+**With the cap-exempt handoff lever as well**, unemployment falls from 28.1% to 18.4%. Only experienced candidates and
+startups stay worse off.
+
+Under the brief's cap, these policies decide *who* waits. Only changing the cap decides *how many*.
 
 ---
 
 ## 5. Assumptions (every invented number)
 
-| Assumption | Value | Where | Why it's needed |
-|---|---|---|---|
-| Mentor effect on grad quits | −30% quit probability for 4 quarters | `mentorAttritionCut` | No data in the model on mentoring. **Measured: it drives essentially all of Feature 4's grad-retention gain** (see above). |
-| Corridor cost | $250k per corridor per quarter | `ASSUMPTIONS.corridorCostPerQuarter` | Makes the trade-off visible. Not a real cost estimate. |
-| Corridor effect | −40% effective commute miles; neighbours within 8 mi share it | `cutPct`, `spillMiles` | Stands in for a shuttle and hub cutting door-to-door time. |
-| Commute hours | miles × 2 trips × 5 days ÷ 30 mph | `ASSUMPTIONS` | For a readable KPI only. |
-| CO₂ | 0.4 kg per vehicle mile, one person per car | `ASSUMPTIONS.kgCo2PerMile` | For a readable KPI only. |
-| Recession | layoff rates ×2, funded growth 0 for 4 quarters | `shock = 1` | Makes a shock visible; not calibrated to a real cycle. |
-| Boom | funded growth ×2, hiring cap ×1.5 for 4 quarters | `shock = 2` | Same. |
-| Fit-rank idle boost | up to +30% at 8+ idle quarters | `fairIdleBoostPct` | Tuned in 2 rounds to keep most of the grad gain while halving the harm to startups. |
-| Persona score scales | e.g. large companies: −25% headcount → 0, +25% → 100 | `js/metrics.js` `PERSONAS` | Puts personas on one scale for weighting. Heuristic. |
+| Assumption | Value | Setting |
+|---|---|---|
+| Mentor effect on grad quits | −30% for 4 quarters. **Drives almost all of Feature 4's grad-retention gain.** | `mentorAttritionCut` |
+| Corridor cost | $250k per corridor per quarter | `ASSUMPTIONS.corridorCostPerQuarter` |
+| Corridor effect | −40% commute miles; neighbours within 8 miles share it | `cutPct`, `spillMiles` |
+| Commute hours | miles × 2 trips × 5 days ÷ 30 mph | `ASSUMPTIONS` |
+| CO₂ | 0.4 kg per vehicle mile, one person per car | `ASSUMPTIONS.kgCo2PerMile` |
+| Recession | layoffs ×2, funded growth 0, for 4 quarters | `shock = 1` |
+| Boom | funded growth ×2, hiring cap ×1.5, for 4 quarters | `shock = 2` |
+| Fit-rank idle boost | up to +30% at 8+ quarters looking (tuned in 2 rounds) | `fairIdleBoostPct` |
+| Persona score scales | e.g. large companies: −25% headcount = 0, +25% = 100 | `js/metrics.js` |
 
-The original model's own calibrated settings (pay bands, acceptance curve, slate size) are unchanged. They're described
-in section 8.
+The original model's own calibrated values (pay bands, acceptance curve, slate size) are unchanged (section 9).
 
 ---
 
 ## 6. Limitations and honest negatives
 
-- **The hiring cap bounds everything.** With backfills counting toward a 5%-a-quarter cap, total hires barely move.
-  Fair-Chance, the cap-faithful Warm Handoff and Bay Corridors mainly **move jobs between groups**. The NET rows in the
-  tables show it.
+- **The cap limits everything.** Fair-Chance, the cap-counting Warm Handoff and Bay Corridors mainly move jobs between
+  groups. See the NET rows.
 - **Groups that get worse:**
-  - **Fair-Chance:** job switchers, laid-off people, **experienced (10y+) candidates**, and startups (smaller loss).
-  - **Warm Handoff (cap counts):** job switchers and new grads lose the seats laid-off people take.
-  - **Corridors alone:** new grads lose about 2 points, as more distant experienced candidates accept.
-  - Exact sizes are in each table.
-- **Features that didn't help.**
-  - *Slate rotation* made placement worse. It's kept only as a labelled comparison.
-  - *Bay Corridors* (three suggested lines) cut commutes 1.3 miles but **did not narrow the regional gap**, and cost new
-    grads 2.6 points. They're shipped as a commute and emissions tool, not as a regional fix.
-- **What comes from assumptions.**
-  - The grad-retention benefit of Retire-to-Mentor comes almost entirely from the assumed 30% quit cut.
-  - The cap-exempt handoff's large gains come from bypassing the cap. It's a policy choice, not a free improvement.
-- **Limited evidence.** Three seeds at full scale, with tuning on two seeds at 100 companies and 3 years. The seeds agree
-  closely (see the per-seed brackets), but it's still one model with hand-set parameters.
-- **What the model leaves out** (unchanged from the original): nobody moves house, there's no remote work, companies'
-  growth plans don't respond to the market, and distance is straight-line × 1.2.
-- **Runtime.** A full run takes several seconds in the browser, so the Lab's default compare scale is smaller than the
-  main run.
+  - *Fair-Chance:* experienced candidates (−28 pts), switchers (−10), laid-off people (−7), startups (−5).
+  - *Warm Handoff:* switchers (−6).
+  - *Corridors alone:* new grads (−3).
+- **Did not measurably help:**
+  - *Bay Corridors* did not narrow the regional gap.
+  - *Slate rotation* made placement worse.
+- **What comes from assumptions or levers:**
+  - Retire-to-Mentor's grad-retention gain is the assumed 30% cut.
+  - The cap-exempt handoff's big gain comes from bypassing the cap.
+- **Evidence:** three seeds at full scale; tuning on two seeds at small scale. The seeds agree closely, but it's one model
+  with hand-set values.
+- **Not modelled** (as in the original): moving house, remote work, growth plans that react to the market. Distance is
+  straight-line × 1.2.
 
 ---
 
-## 7. How AI was used, and the thought process
+## 7. How AI was used
 
-**AI use.** I built this with an AI coding assistant (Claude, in Claude Code) as a pair programmer. It read the codebase,
-wrote and ran the measurement tools and tests, prototyped each feature, and drafted this README. I directed the
-personas, the features and the constraints, and reviewed the trade-offs. Every number here comes from running the code.
-**The simulator itself contains no AI or machine learning, and makes no network calls.** Everything in the app, including
-the Policy Lab's scorecard and autopilot, is deterministic heuristics and a small grid search.
+I used an AI coding assistant for development and prototyping: reading the code, writing measurement scripts and tests,
+and drafting. The simulator itself uses deterministic rules and scoring only. It has no machine learning and makes no
+network calls.
 
-**How I worked.**
-1. **Measure before building.** I wrote `js/metrics.js` and the compare tools first, then checked the claims I had
-   (unemployment 3% → 28%, the cap as the binding constraint, the slate-40 collapse, commute and the regional gap). One
-   correction surfaced: the regional fix (`nearbyMiles 60`) also wrecks grad placement. That shaped Features 1 and 3.
-2. **Keep the original reproducible.** Every feature defaults off, and the new code consumes no random draws when it's
-   off. I saved an untouched copy of the original engine (`test/fixtures/engine.original.js`), and a test compares every
-   series field on three seeds.
-3. **At most 2 tuning rounds per feature** at small scale, then ship the best option and record the trade-off.
-4. **Report losers.** The NET placement line, the persona "who loses" line and the per-seed brackets exist so that a
-   feature that only moves jobs between groups can't look like a win.
-
-**Considered and dropped.**
-- *Raising the hiring cap or exempting backfills.* That's the biggest lever by far (unemployment 28% → 9.5%), but it
-  changes a rule from the brief. It stays as the original's toggle, and as the explicitly labelled cap-exempt handoff
-  lever.
-- *Ranking by P(accept) including commute.* It helped grads but widened the regional gap by 9–13 points. Kept as an
+**Considered and dropped**
+- *Raising the hiring cap or exempting backfills:* the biggest lever (unemployment 28% → 9.5%), but it changes a rule
+  from the brief. It stays as the original toggle and as the labelled cap-exempt handoff lever.
+- *Ranking by P(accept) including commute:* it helped grads but widened the city gap by 9–13 points. It's kept as an
   off-by-default toggle.
-- *Moving people or companies, or adding remote work.* They change the model's basic assumptions, so they were out of
-  scope for "build on top, same mechanism".
-- *Web Workers for the Lab.* They don't run from `file://`, so I used chunked `setTimeout` runs instead.
+- *Moving people or companies, or remote work:* these change the model's basic assumptions, so they're out of scope for
+  "build on top, same mechanism".
+- *Web Workers for the Policy Lab:* they don't run from `file://`, so runs are split into small `setTimeout` steps.
 
 ---
 
-## 8. The original model (unchanged)
+## 8. Further improvements
 
-**Map.** About 50 cities from San Rafael and Concord down to Los Gatos, east to Pleasanton, with 2020 Census
-populations. The shoreline, islands, freeways and bridges are traced by hand.
+The current work is complete and runs end to end. These are the extensions I'd add next:
+- **Corridors from the hardest-hit cities.** Measure corridors drawn from the North Bay and Tri-Valley. The app already
+  lets you draw them, but I haven't measured them yet.
+- **More seeds and confidence ranges**, so every table shows a spread as well as a mean.
+- **Persona-specific policies for more groups**, for example a re-entry path for experienced candidates, the group
+  Fair-Chance asks the most of.
+- **Calibrating assumed values** (the mentor quit cut, corridor cost, shock multipliers) against real data.
+- **Remote work and moving house**, to test whether location still drives the regional gap.
+- **A finer autopilot search at full scale**, with more levels per feature.
 
-**Companies.** 500 Bay Area–headquartered companies:
-- **100 named companies**, whose Bay Area engineer counts are **rough estimates, not sourced figures**, placed at their HQ
-  city.
-- **150 synthetic growth-stage companies** (30–140 engineers).
-- **250 synthetic startups** (≤ 25 people). Synthetic companies are labelled as such everywhere.
+---
 
-The simulation runs **X** of them: the X/2 largest plus X/2 startups (default X = 200, so every named company is
-included).
+## 9. The original model (unchanged)
 
-**Org charts.** Every company starts as a 1:10 pyramid: E engineers → ⌈E/10⌉ managers → … → one head of engineering.
+**Map.** About 50 cities from San Rafael and Concord to Los Gatos and Pleasanton, with 2020 Census populations.
+
+**Companies.** 500 Bay Area companies:
+- **100 named companies**, with engineer counts that are **rough estimates, not sourced figures**;
+- **150 synthetic growth-stage companies** (30–140 engineers);
+- **250 synthetic startups** (≤ 25 people).
+
+The simulation runs X of them: the X/2 largest plus X/2 startups (default X = 200).
 
 **People.** Each person has:
 - a home city, drawn in proportion to population;
 - a level and years of experience;
-- a comp, and the comp of the seat they hold (the "band");
-- a status: employed, new grad looking, switching jobs, laid off and looking, retired, or left the Bay Area.
+- a pay, and the pay band of their seat;
+- a status: employed, new grad looking, switching jobs, laid off, retired, or left the Bay Area.
 
-### The rules, as given (all configurable)
+**The rules, as given (all configurable)**
 
 | Rule | Implementation |
 |---|---|
 | X/2 large companies, X/2 startups; startups max 25 | Startups never exceed the cap (tested). |
-| Hire ≤ 5% of headcount per quarter, minimum 5 | Applied per company per quarter. By default backfills count too. |
-| Half-life 4 years (large), 2 years (startup) | Quarterly exit probability 1 − ½^(1/(4·half-life)): 4.2% and 8.3%. |
-| 10% raise per year; 5% of comp hiring cost | Raises go to incumbents each Q1. Every hire costs 5% of the offer. |
-| A fixed position's comp grows 2% per year | Bands and open reqs grow 2% each Q1. A backfill reopens the leaver's seat at its band. |
-| New grads 3% of the working population per year | They arrive in Q3, or spread across the year (setting). |
+| Hire ≤ 5% of headcount per quarter, minimum 5 | Per company per quarter. By default replacement hires count too. |
+| Half-life 4 years (large), 2 years (startup) | Quarterly exit probability 4.2% and 8.3%. |
+| 10% raise per year; hiring costs 5% of pay | Raises each Q1. |
+| A seat's pay grows 2% per year | Bands and open jobs grow 2% each Q1. |
+| New grads 3% of the workforce per year | They arrive in Q3. |
 | Retirements 2% per year | The most experienced are the likeliest to retire. |
-| Layoffs 5% per year (large), 20% (startups), at random | One round a year (Q1 by default). Laid-off seats are eliminated. Option: lay off the most over-band people first. |
-| Laid-off people take a 20% discount | They ask 80% of their last comp. |
-| A closer candidate accepts at 2× the rate at equal comp | P(accept) = 75% × (offer ÷ ask)^4 × ½^(commute ÷ 15 mi). |
+| Layoffs 5% per year (large), 20% (startups) | One round a year (Q1). Laid-off seats are eliminated. |
+| Laid-off people take a 20% pay discount | They ask 80% of their last pay. |
+| A closer candidate accepts at 2× the rate | P(accept) = 75% × (offer ÷ ask)^4 × ½^(commute ÷ 15 mi). |
 
 **How a hire happens.**
-- Each open req screens 12 candidates from the pool and offers them in order: most experienced first in the original, or
-  by fit with Fair-Chance.
-- It offers each one their ask, capped at the band.
-- Unfilled reqs raise their band 3% a quarter.
-- Half of manager vacancies are filled by promoting from within.
-- Candidates who stay idle lower their ask by 2% a quarter.
+- Each open job screens 12 candidates. In the original, it offers in order of experience; with Fair-Chance, in order of
+  fit.
+- Each candidate is offered their ask, capped at the band.
+- Unfilled jobs raise their band 3% a quarter.
+- Half of manager vacancies are filled from within.
+- People looking for work lower their ask 2% a quarter.
 
-**Quarter order.** Raises (Q1), retirements, voluntary exits, the layoff round, graduates, growth plan, *(Warm Handoff)*,
-hiring, then the pool ages.
+**Quarter order.** Raises (Q1), retirements, voluntary exits, layoffs, graduates, growth plan, *(Warm Handoff)*, hiring,
+then the pool ages.
 
-### Interpretations I had to choose (original, still valid)
-
-- **"The remaining 1%."** I read the brief's "3% grads in, 2% retire, remaining 1% laid off" as the net 1% of new supply
-  each year. That 1% lands in the talent pool unless companies grow faster than they lay off.
-- **Does the 5% cap include backfills?** The literal reading is yes, and that's the default. A large company loses about
-  23% of its people a year, while a 5% quarterly cap lets it hire only about 20%. So big companies shrink about 22% over
-  five years and unemployment climbs from 3% to about 28%. The toggle "Backfills count toward the cap" switches to the
-  other reading.
-- **Funded growth.** Large companies grow 5% a year; startups 40% a year up to their cap.
-- **Starting pool.** 3% of the workforce starts out looking for work.
-- **Calibrated matching settings.** The acceptance curve, slate size and offer escalation are calibrated so the market
-  clears when the cap doesn't bind.
+**Interpretations (original, still valid)**
+- **"The remaining 1%."** Read as the net 1% of new supply each year (3% grads in, 2% retiring).
+- **Does the 5% cap include replacement hires?** The literal reading is yes, and that's the default. Large companies then
+  shrink about 22% in five years. A toggle switches to the other reading.
+- **Funded growth:** large companies 5% a year; startups 40% a year up to their cap.
+- **Starting pool:** 3% of the workforce starts out looking for work.
 
 ---
 
-## 9. Files
+## 10. Files
 
 ```
-index.html               page shell (presets and demo, Policy Lab button, corridor bar)
+index.html               page (presets and demo, Policy Lab button, corridor bar)
 styles.css               light + dark themes, responsive
-js/data/*.js             cities, geography, the 500-company universe (unchanged)
-js/engine.js             the simulation (no DOM). New: Fair-Chance, Warm Handoff, Bay Corridors, Retire-to-Mentor,
-                         stress shocks, visibility tracking. All opt-in.
+js/data/*.js             cities, geography, the 500 companies (unchanged)
+js/engine.js             the simulation (no DOM), with the four opt-in features, stress shocks and visibility tracking
 js/metrics.js            NEW persona metrics and scorecard, shared by the browser and Node
-js/ui/lab.js             NEW Policy Lab: scorecard, compare, stress tests, autopilot
-js/ui/charts.js          formatting and SVG charts (unchanged)
-js/ui/map.js             SVG map. New: corridor layer and drawing, warm-handoff arcs
-js/ui/overlays.js        company, city, raw data, employee timeline. New: Lab hook, new timeline events
-js/ui/insights.js        end-of-run summary (unchanged)
-js/app.js                controls, run loop, dashboard. New: Uplift group, Visibility tab, KPIs, corridors, presets
-test/engine.test.js      27 tests: the original 16, identical-to-original, and each feature's invariants
-test/fixtures/engine.original.js   the engine exactly as provided, for the identical-to-original test
-tools/metrics.js         Node entry for the metrics; runConfig()
-tools/baseline.js        one run, all persona metrics
-tools/compare.js         configs vs a reference on several seeds, with per-seed deltas
-tools/final-tables.sh    regenerates the README tables into tools/results/
-tools/md-table.js        compare output → Markdown table
-tools/headless.js        headless Chrome check over the DevTools protocol (no dependencies)
-tools/readme-txt.js      README.md → README.txt
+js/ui/lab.js             NEW Policy Lab
+js/ui/map.js             map; new corridor layer and drawing, warm-handoff arcs
+js/ui/overlays.js        detail windows; new timeline events
+js/ui/charts.js, insights.js   unchanged
+js/app.js                controls and dashboard; new Uplift group, Visibility tab, KPIs, corridors, presets
+test/engine.test.js      27 tests: the original 16, identical-to-original, and each feature's rules
+test/fixtures/engine.original.js   the engine exactly as provided
+tools/                   metrics, baseline, compare, final tables, headless check, README.txt generator
 tools/results/           the measured outputs quoted in this README
 ```

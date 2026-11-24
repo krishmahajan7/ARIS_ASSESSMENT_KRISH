@@ -11,6 +11,9 @@ const out = [];
 md.split(/\r?\n/).forEach((line) => {
   if (line.startsWith('```')) { inCode = !inCode; return; }
   if (inCode) { out.push('    ' + line); return; }
+  const det = line.match(/^<details><summary>(.*)<\/summary>$/);
+  if (det) { out.push(strip(det[1]) + ':'); return; }
+  if (line.trim() === '</details>') return;
   const h = line.match(/^(#{1,4})\s+(.*)$/);
   if (h) {
     const text = strip(h[2]);
