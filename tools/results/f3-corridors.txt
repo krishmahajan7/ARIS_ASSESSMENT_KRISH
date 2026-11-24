@@ -1,0 +1,33 @@
+Seeds: 42, 7, 123
+  A (defaults)
+  B {"corridors":"suggest"}
+  C {"corridors":"suggest","fairScreening":1}
+
+Metric                              |          A |          B | ΔB (per seed)                  |          C | ΔC (per seed)                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+Unemployment at end                 |      28.1% |      28.3% | +0.1pt (+0.2pt +0.2pt −0.0pt)  |      27.6% | −0.5pt (−0.3pt −0.5pt −0.8pt) 
+NET placed ≤4Q, all cohorts (count) |    155,548 |    156,010 | +462 (+48 +320 +1,018)         |    146,931 | −8,618 (−9,146 −8,560 −8,147) 
+NET placed ≤4Q, all cohorts (share) |      59.5% |      59.6% | +0.2pt (+0.1pt −0.0pt +0.4pt)  |      56.0% | −3.4pt (−3.6pt −3.5pt −3.2pt) 
+New grads placed ≤4Q                |      39.2% |      36.5% | −2.6pt (−2.5pt −2.6pt −2.9pt)  |      76.8% | +37.7pt (+37.6pt +38.0pt +37.4pt)
+New grads: quarters to hire         |      3.06q |      3.24q | +0.18q (+0.18q +0.17q +0.19q)  |      1.63q | −1.43q (−1.43q −1.45q −1.40q) 
+New grads stuck at end              |     20,142 |     21,032 | +890 (+825 +849 +996)          |      9,142 | −11,001 (−10,870 −11,153 −10,979)
+Laid off placed ≤4Q                 |      67.7% |      68.3% | +0.5pt (+0.2pt +0.5pt +0.9pt)  |      60.8% | −7.0pt (−7.3pt −7.0pt −6.6pt) 
+Laid off: quarters to hire          |      1.98q |      1.95q | −0.03q (−0.03q −0.03q −0.03q)  |      2.33q | +0.34q (+0.35q +0.34q +0.33q) 
+Laid off: rehire pay ratio          |      0.741 |      0.742 | +0.000 (−0.000 +0.000 +0.001)  |      0.750 | +0.009 (+0.008 +0.009 +0.009) 
+Laid off stuck at end               |      9,611 |      9,496 | −115 (+1 −68 −278)             |     10,836 | +1,225 (+1,455 +1,261 +958)   
+Experienced 10y+ placed ≤4Q         |      61.4% |      62.5% | +1.2pt (+1.0pt +1.1pt +1.5pt)  |      32.7% | −28.7pt (−28.8pt −28.6pt −28.5pt)
+Switchers placed ≤4Q                |      60.5% |      61.1% | +0.6pt (+0.5pt +0.3pt +0.9pt)  |      50.4% | −10.1pt (−10.2pt −10.2pt −9.8pt)
+Switchers: quarters to hire         |      2.28q |      2.25q | −0.02q (−0.02q −0.02q −0.04q)  |      2.96q | +0.69q (+0.70q +0.69q +0.66q) 
+Switchers stuck at end              |     50,702 |     50,221 | −481 (−410 −221 −813)          |     59,188 | +8,486 (+8,763 +8,723 +7,971) 
+Pool idle 4+ quarters               |      66.2% |      66.2% | −0.1pt (−0.3pt +0.4pt −0.3pt)  |      62.1% | −4.1pt (−4.2pt −3.8pt −4.4pt) 
+Large-company headcount change      |     -22.7% |     -22.8% | −0.1pt (−0.2pt −0.2pt +0.0pt)  |     -22.1% | +0.6pt (+0.4pt +0.6pt +0.9pt) 
+Startup headcount change            |      31.5% |      31.9% | +0.3pt (±0.0pt +0.9pt +0.1pt)  |      26.8% | −4.7pt (−5.9pt −4.1pt −4.0pt) 
+Unfilled reqs at end                |     43,716 |     44,184 | +468 (+416 +796 +192)          |     41,901 | −1,816 (−1,345 −1,580 −2,522) 
+Avg fill time (quarters)            |      1.35q |      1.36q | +0.00q (+0.01q +0.01q −0.01q)  |      1.33q | −0.03q (−0.01q −0.02q −0.05q) 
+Avg commute                         |     21.8mi |     20.5mi | −1.3mi (−1.2mi −1.3mi −1.3mi)  |     20.7mi | −1.1mi (−1.0mi −1.1mi −1.1mi) 
+City unemployment gap p90−p10       |      21.2% |      21.5% | +0.3pt (+0.3pt −0.3pt +0.8pt)  |      14.2% | −7.0pt (−8.0pt −7.2pt −5.7pt) 
+Retirements                         |     27,875 |     27,875 | ±0 (±0 ±0 ±0)                  |     27,875 | ±0 (±0 ±0 ±0)                 
+Retired + still mentoring at end    |     27,875 |     27,875 | ±0 (±0 ±0 ±0)                  |     27,875 | ±0 (±0 ±0 ±0)                 
+Grad hires: first-year quit rate    |      14.1% |      14.1% | −0.0pt (−0.6pt +0.4pt +0.1pt)  |      14.2% | +0.1pt (−0.4pt +0.4pt +0.3pt) 
+Open backfill reqs at end           |     36,447 |     36,932 | +485 (+417 +781 +257)          |     34,708 | −1,738 (−1,303 −1,508 −2,404) 
+Total hires                         |    220,168 |    220,066 | −102 (−220 −209 +123)          |    220,492 | +324 (−88 +251 +808)          

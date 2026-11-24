@@ -1,0 +1,33 @@
+Seeds: 42, 7, 123
+  A (defaults)
+  B {"warmHandoff":1}
+  C {"warmHandoff":1,"handoffCountsTowardCap":0}
+
+Metric                              |          A |          B | ΔB (per seed)                  |          C | ΔC (per seed)                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+Unemployment at end                 |      28.1% |      28.3% | +0.1pt (+0.3pt +0.0pt +0.0pt)  |      19.8% | −8.4pt (−8.3pt −8.3pt −8.5pt) 
+NET placed ≤4Q, all cohorts (count) |    155,548 |    156,843 | +1,295 (+710 +1,427 +1,748)    |    194,731 | +39,183 (+39,188 +38,614 +39,746)
+NET placed ≤4Q, all cohorts (share) |      59.5% |      59.9% | +0.4pt (+0.2pt +0.4pt +0.6pt)  |      71.8% | +12.4pt (+12.4pt +12.1pt +12.6pt)
+New grads placed ≤4Q                |      39.2% |      39.3% | +0.2pt (+0.3pt +0.1pt +0.0pt)  |      55.7% | +16.6pt (+16.7pt +16.2pt +16.8pt)
+New grads: quarters to hire         |      3.06q |      3.01q | −0.06q (−0.07q −0.04q −0.06q)  |      2.58q | −0.48q (−0.49q −0.46q −0.50q) 
+New grads stuck at end              |     20,142 |     19,890 | −252 (−210 −368 −179)          |     13,424 | −6,719 (−6,646 −6,771 −6,739) 
+Laid off placed ≤4Q                 |      67.7% |      86.2% | +18.4pt (+18.1pt +18.4pt +18.8pt) |      91.5% | +23.7pt (+23.6pt +23.6pt +24.0pt)
+Laid off: quarters to hire          |      1.98q |      0.76q | −1.22q (−1.21q −1.22q −1.22q)  |      0.54q | −1.44q (−1.43q −1.44q −1.45q) 
+Laid off: rehire pay ratio          |      0.741 |      0.779 | +0.038 (+0.038 +0.038 +0.038)  |      0.780 | +0.039 (+0.038 +0.039 +0.039) 
+Laid off stuck at end               |      9,611 |      4,186 | −5,425 (−5,269 −5,389 −5,617)  |      2,201 | −7,410 (−7,341 −7,320 −7,570) 
+Experienced 10y+ placed ≤4Q         |      61.4% |      59.0% | −2.4pt (−2.7pt −2.3pt −2.1pt)  |      69.5% | +8.2pt (+8.1pt +8.0pt +8.4pt) 
+Switchers placed ≤4Q                |      60.5% |      54.8% | −5.7pt (−5.9pt −5.7pt −5.5pt)  |      68.1% | +7.6pt (+7.6pt +7.3pt +7.9pt) 
+Switchers: quarters to hire         |      2.28q |      2.59q | +0.32q (+0.33q +0.32q +0.31q)  |      2.00q | −0.27q (−0.28q −0.26q −0.29q) 
+Switchers stuck at end              |     50,702 |     56,669 | +5,967 (+6,241 +5,735 +5,924)  |     41,023 | −9,679 (−9,588 −9,459 −9,989) 
+Pool idle 4+ quarters               |      66.2% |      66.3% | +0.0pt (−0.1pt +0.2pt +0.0pt)  |      54.5% | −11.7pt (−11.9pt −11.2pt −12.0pt)
+Large-company headcount change      |     -22.7% |     -22.8% | −0.1pt (−0.3pt −0.0pt −0.0pt)  |     -13.6% | +9.1pt (+9.0pt +9.0pt +9.3pt) 
+Startup headcount change            |      31.5% |      31.1% | −0.4pt (−0.5pt +1.1pt −1.9pt)  |      30.9% | −0.6pt (−1.8pt +1.2pt −1.2pt) 
+Unfilled reqs at end                |     43,716 |     43,578 | −138 (+149 −283 −281)          |     24,632 | −19,084 (−19,091 −18,697 −19,465)
+Avg fill time (quarters)            |      1.35q |      1.34q | −0.01q (+0.00q −0.01q −0.03q)  |      0.71q | −0.65q (−0.64q −0.63q −0.66q) 
+Avg commute                         |     21.8mi |     21.3mi | −0.5mi (−0.5mi −0.5mi −0.5mi)  |     21.1mi | −0.7mi (−0.7mi −0.7mi −0.7mi) 
+City unemployment gap p90−p10       |      21.2% |      21.3% | +0.1pt (−0.2pt −0.7pt +1.2pt)  |      19.3% | −1.9pt (−2.9pt −1.6pt −1.1pt) 
+Retirements                         |     27,875 |     27,875 | ±0 (±0 ±0 ±0)                  |     27,875 | ±0 (±0 ±0 ±0)                 
+Retired + still mentoring at end    |     27,875 |     27,875 | ±0 (±0 ±0 ±0)                  |     27,875 | ±0 (±0 ±0 ±0)                 
+Grad hires: first-year quit rate    |      14.1% |      13.9% | −0.2pt (−0.8pt −0.0pt +0.3pt)  |      13.9% | −0.1pt (−0.6pt +0.1pt +0.1pt) 
+Open backfill reqs at end           |     36,447 |     36,223 | −224 (+50 −342 −379)           |     19,965 | −16,482 (−16,485 −16,141 −16,820)
+Total hires                         |    220,168 |    219,907 | −261 (−560 −79 −144)           |    257,407 | +37,238 (+37,146 +37,042 +37,527)

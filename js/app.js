@@ -50,14 +50,14 @@
     ] },
     { group: 'Uplift features', note: 'Opt-in policies built on top of the original model. All off = the original simulator, number for number.', items: [
       { key: 'fairScreening', label: 'Fair-Chance: offer by fit, not seniority', toggle: true,
-        hint: 'Recruiters offer first to the candidate whose ask the seat can best meet, instead of the most experienced. Measured: new grads gain a lot; job-switchers and laid-off people lose a little.' },
+        hint: 'Recruiters offer first to the candidate whose ask the seat can best meet, instead of the most experienced. Measured (full scale, 3 seeds): new grads placed within 4 quarters +37 points and the city gap −7 points; experienced (10y+) candidates −28, switchers −10, laid-off −7. Under the cap, total hires don’t change.' },
       { key: 'fairIdleBoostPct', label: 'Fit boost for long-idle people', unit: '% at 8+ qtrs', min: 0, max: 100, step: 5, hint: 'Softens the cost to switchers and startups.' },
       { key: 'fairRankDistance', label: 'Fit rank also weighs commute', toggle: true, hint: 'Off by default: ranking on commute too widened the city unemployment gap by about 9–13 points.' },
       { key: 'fairRotation', label: 'Reserve slate seats for the longest-idle', toggle: true, hint: 'Measured: long-idle people are already screened, so this did not help on its own. Kept for comparison.' },
       { key: 'fairRotationPct', label: 'Reserved share of each slate', unit: '%', min: 0, max: 50, step: 5 },
       { key: 'warmHandoff', label: 'Warm Handoff: redeploy laid-off people', toggle: true,
         hint: 'The quarter of a layoff, each laid-off person gets first look at open seats at nearby companies, before general hiring. Same offer rule and acceptance formula.' },
-      { key: 'handoffCountsTowardCap', label: 'Handoff hires count toward the cap', toggle: true, hint: 'On = the brief’s 5% rule (jobs move between groups). Off = a policy lever that lets redeployment bypass the cap.' },
+      { key: 'handoffCountsTowardCap', label: 'Handoff hires count toward the cap', toggle: true, hint: 'On = the brief’s 5% rule: laid-off people placed within 4 quarters +18 points, rehired at 78% of old pay instead of 74%, but switchers −6 (jobs move between groups). Off = a policy lever that bypasses the cap: unemployment −8 points.' },
       { key: 'handoffRadiusMiles', label: 'Handoff radius, HQ to HQ', unit: 'mi', min: 5, max: 60, step: 5 },
       { key: 'handoffSharePct', label: 'Laid-off people offered a handoff', unit: '%', min: 0, max: 100, step: 10 },
       { key: 'mentorSharePct', label: 'Retire-to-Mentor: retirees who phase out', unit: '%', min: 0, max: 100, step: 10,
@@ -549,7 +549,7 @@
       + '<button class="btn" type="button" id="corr-draw" aria-pressed="' + !!state.drawing + '"' + (locked() ? ' disabled' : '') + '>' + (state.drawing ? 'Cancel drawing' : 'Draw corridor') + '</button>'
       + '<button class="btn" type="button" id="corr-suggest"' + (locked() ? ' disabled' : '') + ' title="The 3 home → job city pairs with the most people looking (weighted by local unemployment) against open seats, where a corridor would most raise acceptance. Computed from the current run.">Suggest 3</button>'
       + (has ? '<button class="link" type="button" id="corr-clear"' + (locked() ? ' disabled' : '') + '>Clear</button>' : '')
-      + '<span class="corr-list">' + (list || '<span class="muted">None. A corridor (shuttle line + hub) cuts effective commute miles between two cities and their neighbours.</span>') + '</span></div>'
+      + '<span class="corr-list">' + (list || '<span class="muted">None. A corridor (shuttle line + hub) cuts effective commute miles between two cities and their neighbours. Measured: 3 suggested corridors cut the average commute ~1.3 mi but did not narrow the regional unemployment gap.</span>') + '</span></div>'
       + '<div class="corr-kpis">'
       + '<span title="ASSUMPTION: $' + fmt.k(A.corridorCostPerQuarter) + ' per corridor per quarter">Cost <b>' + fmt.money(state.corridors.length * A.corridorCostPerQuarter) + '</b>/qtr <i>assumed</i></span>'
       + '<span title="ASSUMPTION: 2 trips a day, 5 days a week, 30 mph">Commute <b>' + hours.toFixed(1) + ' h</b>/wk' + (has ? ' <span class="muted">(' + hours0.toFixed(1) + ' h without lines)</span>' : '') + ' <i>assumed</i></span>'

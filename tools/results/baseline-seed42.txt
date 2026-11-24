@@ -1,0 +1,35 @@
+Config: {}  (seed 42, 5 y, 200 companies, 8466 ms)
+Unemployment by year: 2.9% → 8.5% → 13.7% → 18.7% → 23.5% → 28.0%
+
+  Unemployment at end                  28.0%
+  NET placed ≤4Q, all cohorts (count)  155,997
+  NET placed ≤4Q, all cohorts (share)  59.6%
+  New grads placed ≤4Q                 39.2%
+  New grads: quarters to hire          3.07q
+  New grads stuck at end               20,057
+  Laid off placed ≤4Q                  68.1%
+  Laid off: quarters to hire           1.97q
+  Laid off: rehire pay ratio           0.742
+  Laid off stuck at end                9,477
+  Experienced 10y+ placed ≤4Q          61.6%
+  Switchers placed ≤4Q                 60.6%
+  Switchers: quarters to hire          2.27q
+  Switchers stuck at end               50,493
+  Pool idle 4+ quarters                66.3%
+  Large-company headcount change       -22.5%
+  Startup headcount change             32.6%
+  Unfilled reqs at end                 43,450
+  Avg fill time (quarters)             1.34q
+  Avg commute                          21.8mi
+  City unemployment gap p90−p10        21.8%
+  Retirements                          27,875
+  Retired + still mentoring at end     27,875
+  Grad hires: first-year quit rate     14.6%
+  Open backfill reqs at end            36,188
+  Total hires                          220,457
+
+  Cohorts (entered / eligible for 4Q check / still looking):
+    grad      41192 / 32796 / 20057
+    laidOff   58535 / 58535 / 9477
+    switcher  196452 / 170348 / 50493
+  Region unemployment: San Francisco 32.1%, Peninsula 27.9%, South Bay 19.6%, East Bay 30.9%, Tri-Valley & 680 37.4%, North Bay 45.3%

@@ -1,0 +1,33 @@
+Seeds: 42, 7, 123
+  A (defaults)
+  B {"mentorSharePct":50}
+  C {"mentorSharePct":50,"mentorAttritionCut":0}
+
+Metric                              |          A |          B | ΔB (per seed)                  |          C | ΔC (per seed)                 
+--------------------------------------------------------------------------------------------------------------------------------------------
+Unemployment at end                 |      28.1% |      27.2% | −0.9pt (−0.8pt −0.8pt −1.1pt)  |      27.5% | −0.6pt (−0.6pt −0.6pt −0.7pt) 
+NET placed ≤4Q, all cohorts (count) |    155,548 |    158,348 | +2,800 (+2,609 +2,859 +2,931)  |    158,003 | +2,454 (+1,938 +2,814 +2,611) 
+NET placed ≤4Q, all cohorts (share) |      59.5% |      60.3% | +0.9pt (+0.8pt +0.8pt +1.0pt)  |      60.1% | +0.6pt (+0.5pt +0.7pt +0.7pt) 
+New grads placed ≤4Q                |      39.2% |      40.8% | +1.7pt (+1.9pt +1.9pt +1.2pt)  |      40.4% | +1.2pt (+0.9pt +1.8pt +1.0pt) 
+New grads: quarters to hire         |      3.06q |      3.00q | −0.06q (−0.09q −0.05q −0.06q)  |      2.99q | −0.07q (−0.05q −0.12q −0.05q) 
+New grads stuck at end              |     20,142 |     19,682 | −460 (−428 −602 −350)          |     19,908 | −235 (−27 −446 −231)          
+Laid off placed ≤4Q                 |      67.7% |      68.5% | +0.8pt (+0.8pt +0.8pt +0.8pt)  |      68.3% | +0.6pt (+0.4pt +0.7pt +0.6pt) 
+Laid off: quarters to hire          |      1.98q |      1.95q | −0.03q (−0.03q −0.05q −0.02q)  |      1.95q | −0.03q (−0.03q −0.04q −0.03q) 
+Laid off: rehire pay ratio          |      0.741 |      0.740 | −0.001 (−0.001 −0.001 −0.000)  |      0.740 | −0.001 (−0.001 −0.001 −0.000) 
+Laid off stuck at end               |      9,611 |      9,384 | −227 (−205 −126 −350)          |      9,510 | −101 (−18 −120 −165)          
+Experienced 10y+ placed ≤4Q         |      61.4% |      61.7% | +0.3pt (+0.3pt +0.2pt +0.5pt)  |      61.5% | +0.2pt (+0.0pt +0.1pt +0.3pt) 
+Switchers placed ≤4Q                |      60.5% |      61.2% | +0.7pt (+0.7pt +0.6pt +1.0pt)  |      61.0% | +0.5pt (+0.4pt +0.4pt +0.7pt) 
+Switchers: quarters to hire         |      2.28q |      2.26q | −0.02q (−0.01q −0.02q −0.03q)  |      2.27q | −0.01q (−0.00q −0.00q −0.02q) 
+Switchers stuck at end              |     50,702 |     49,472 | −1,230 (−1,080 −877 −1,733)    |     49,933 | −769 (−926 −496 −884)         
+Pool idle 4+ quarters               |      66.2% |      65.5% | −0.7pt (−0.8pt −0.6pt −0.7pt)  |      65.7% | −0.5pt (−0.4pt −0.6pt −0.6pt) 
+Large-company headcount change      |     -22.7% |     -21.0% | +1.7pt (+1.6pt +1.6pt +1.9pt)  |     -21.3% | +1.4pt (+1.3pt +1.4pt +1.4pt) 
+Startup headcount change            |      31.5% |      30.8% | −0.7pt (−1.7pt −0.8pt +0.3pt)  |      30.7% | −0.8pt (−1.9pt −0.6pt −0.1pt) 
+Unfilled reqs at end                |     43,716 |     40,430 | −3,286 (−3,301 −2,737 −3,821)  |     41,182 | −2,534 (−2,569 −2,355 −2,678) 
+Avg fill time (quarters)            |      1.35q |      1.21q | −0.14q (−0.14q −0.14q −0.15q)  |      1.22q | −0.13q (−0.12q −0.14q −0.14q) 
+Avg commute                         |     21.8mi |     21.8mi | −0.0mi (−0.0mi −0.0mi −0.0mi)  |     21.8mi | −0.0mi (+0.1mi −0.0mi −0.0mi) 
+City unemployment gap p90−p10       |      21.2% |      20.5% | −0.7pt (−1.7pt −0.3pt −0.0pt)  |      20.9% | −0.3pt (−1.2pt −0.5pt +0.8pt) 
+Retirements                         |     27,875 |     25,746 | −2,129 (−2,186 −2,078 −2,124)  |     25,757 | −2,118 (−2,079 −2,118 −2,156) 
+Retired + still mentoring at end    |     27,875 |     28,049 | +174 (+175 +174 +174)          |     28,051 | +176 (+177 +175 +176)         
+Grad hires: first-year quit rate    |      14.1% |      10.2% | −3.9pt (−4.5pt −3.7pt −3.5pt)  |      13.9% | −0.1pt (−0.7pt +0.2pt +0.1pt) 
+Open backfill reqs at end           |     36,447 |     33,440 | −3,007 (−2,998 −2,489 −3,533)  |     34,152 | −2,295 (−2,309 −2,155 −2,421) 
+Total hires                         |    220,168 |    223,156 | +2,988 (+2,777 +2,969 +3,218)  |    222,853 | +2,684 (+2,429 +2,874 +2,750) 
