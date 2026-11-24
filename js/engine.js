@@ -72,6 +72,10 @@
     layoffQuarter: 1,
     gradQuarter: 3,          // 0 = spread over the year
     initialPoolPct: 3,       // initial pool, % of employed
+    // Uplift features (all off by default; off = identical to the original model)
+    fairScreening: 0,        // 1 = offer in order of fit (P(accept)), not experience
+    fairRotation: 0,         // 1 = reserve part of each slate for the longest-idle eligible
+    fairRotationPct: 20,     // share of the slate reserved when fairRotation is on
   };
 
   var START_YEAR = 2027;
@@ -172,6 +176,9 @@
     cfg.layoffTargeting = cfg.layoffTargeting ? 1 : 0;
     cfg.freezeOnLayoff = cfg.freezeOnLayoff ? 1 : 0;
     cfg.capIncludesBackfills = cfg.capIncludesBackfills ? 1 : 0;
+    cfg.fairScreening = cfg.fairScreening ? 1 : 0;
+    cfg.fairRotation = cfg.fairRotation ? 1 : 0;
+    cfg.fairRotationPct = Math.max(0, Math.min(50, cfg.fairRotationPct));
     cfg.seed = Math.round(cfg.seed) >>> 0;
     return cfg;
   }
@@ -183,6 +190,11 @@
     employers: Uint8Array, layoffs: Uint8Array, comp: Float32Array, band: Float32Array, expect: Float32Array,
     exp: Float32Array, joinedQ: Int16Array, idleQ: Int16Array, bornQ: Int16Array,
     memberPos: Int32Array, poolPos: Int32Array, activePos: Int32Array,
+    // Visibility: how often someone lands on a slate, and how often a recruiter
+    // actually gets to them with an offer. Bookkeeping only; never read by the
+    // hiring logic. last*Q stores quarter + 1 (0 = never).
+    screened: Uint16Array, screenedSpell: Uint16Array, lastScreenedQ: Int16Array,
+    offeredSpell: Uint16Array, lastOfferedQ: Int16Array,
   };
 
   function Agents(capacity) {
@@ -341,6 +353,8 @@
     A.status[a] = status;
     A.expect[a] = ask;
     A.idleQ[a] = 0;
+    A.screenedSpell[a] = 0;
+    A.offeredSpell[a] = 0;
     A.poolPos[a] = this.pool.length;
     this.pool.push(a);
   };
@@ -665,6 +679,8 @@
   };
 
   // Screen a slate from the pool; offer to the most experienced first.
+  // Fair-Chance Slates (opt-in) changes only who is on the slate and the order
+  // of offers; the offer rule and the acceptance formula are untouched.
   P.fill = function (c, r) {
     var cfg = this.cfg, A = this.agents, pool = this.pool;
     if (!pool.length) return false;
@@ -673,7 +689,15 @@
       var a = pool[this.randInt(pool.length)];
       if (this.eligible(a, r.level) && slate.indexOf(a) < 0) slate.push(a);
     }
-    slate.sort(function (x, y) { return A.exp[y] - A.exp[x]; });
+    if (cfg.fairRotation) slate = this.rotateSlate(slate, r);
+    for (var v = 0; v < slate.length; v++) {
+      var sa = slate[v];
+      if (A.screened[sa] < 65535) A.screened[sa]++;
+      if (A.screenedSpell[sa] < 65535) A.screenedSpell[sa]++;
+      A.lastScreenedQ[sa] = this.q + 1;
+    }
+    if (cfg.fairScreening) this.sortByFit(slate, c, r);
+    else slate.sort(function (x, y) { return A.exp[y] - A.exp[x]; });
     var base = cfg.baseAcceptPct / 100;
     for (var s = 0; s < slate.length; s++) {
       var cand = slate[s];
@@ -681,12 +705,53 @@
       var offer = Math.min(r.band, ask);
       var miles = this.dist[A.city[cand]][c.city];
       var p = base * Math.pow(offer / ask, cfg.compElasticity) * Math.pow(2, -miles / cfg.nearbyMiles);
+      if (A.offeredSpell[cand] < 65535) A.offeredSpell[cand]++;
+      A.lastOfferedQ[cand] = this.q + 1;
       if (this.rand() < p) {
         this.onboard(cand, c, r, offer, miles);
         return true;
       }
     }
     return false;
+  };
+
+  // Fair-Chance rotation: keep a share of the slate for the longest-idle
+  // eligible people, found among the sampled candidates plus a bounded extra
+  // sample (2 × slate draws), so the cost per req stays small.
+  P.rotateSlate = function (slate, r) {
+    var cfg = this.cfg, A = this.agents, pool = this.pool;
+    var k = Math.round(cfg.slate * cfg.fairRotationPct / 100);
+    if (k <= 0) return slate;
+    var union = slate.slice();
+    for (var t = 0; t < cfg.slate * 2; t++) {
+      var a = pool[this.randInt(pool.length)];
+      if (this.eligible(a, r.level) && union.indexOf(a) < 0) union.push(a);
+    }
+    var byIdle = union.slice().sort(function (x, y) { return A.idleQ[y] - A.idleQ[x] || union.indexOf(x) - union.indexOf(y); });
+    var reserved = byIdle.slice(0, Math.min(k, byIdle.length));
+    var out = reserved.slice();
+    for (var i = 0; i < slate.length && out.length < cfg.slate; i++) {
+      if (reserved.indexOf(slate[i]) < 0) out.push(slate[i]);
+    }
+    return out;
+  };
+
+  // Fair-Chance fit order: the candidate most likely to accept this seat goes
+  // first, using the same P(accept) the offer will face. Near-ties (within one
+  // percentage point) go to the cheaper offer, then the closer level fit, then
+  // the smaller surplus of experience over what the seat needs.
+  P.sortByFit = function (slate, c, r) {
+    var cfg = this.cfg, A = this.agents, base = cfg.baseAcceptPct / 100, self = this;
+    var key = {};
+    slate.forEach(function (a) {
+      var ask = A.expect[a], offer = Math.min(r.band, ask);
+      var p = base * Math.pow(offer / ask, cfg.compElasticity) * Math.pow(2, -self.dist[A.city[a]][c.city] / cfg.nearbyMiles);
+      key[a] = [Math.round(p * 100), offer, Math.abs(A.level[a] - r.level), A.exp[a] - MIN_EXP[r.level]];
+    });
+    slate.sort(function (x, y) {
+      var kx = key[x], ky = key[y];
+      return ky[0] - kx[0] || kx[1] - ky[1] || kx[2] - ky[2] || kx[3] - ky[3] || x - y;
+    });
   };
 
   P.onboard = function (a, c, r, offer, miles) {
@@ -762,8 +827,14 @@
       c.totals.retired += qc.retired; c.totals.promos += qc.promos; c.totals.hireSpend += qc.hireSpend;
     });
     var poolBy = [0, 0, 0, 0];
-    var idleSum = 0;
-    for (var p = 0; p < this.pool.length; p++) { poolBy[A.status[this.pool[p]]]++; idleSum += A.idleQ[this.pool[p]]; }
+    var idleSum = 0, unseen = 0, unoffered = 0;
+    for (var p = 0; p < this.pool.length; p++) {
+      var pa = this.pool[p];
+      poolBy[A.status[pa]]++;
+      idleSum += A.idleQ[pa];
+      if (this.unseen(pa)) unseen++;
+      if (this.unoffered(pa)) unoffered++;
+    }
     var retired = 0, exited = 0;
     for (var a = 0; a < A.n; a++) { if (A.status[a] === S.RETIRED) retired++; else if (A.status[a] === S.EXITED) exited++; }
     var f = this.flow || { hires: 0, leavers: 0, layoffs: 0, retired: 0, grads: 0, promos: 0, exits: 0, hireSpend: 0,
@@ -779,6 +850,8 @@
       employed: employed, employedLarge: employedLarge, employedStartup: employedStartup,
       pool: this.pool.length, poolGrad: poolBy[S.GRAD], poolSwitcher: poolBy[S.SWITCHER], poolLaidOff: poolBy[S.LAID_OFF],
       laborForce: lf, unemployment: lf ? this.pool.length / lf : 0, avgIdleQ: this.pool.length ? idleSum / this.pool.length : 0,
+      unseenShare: this.pool.length ? unseen / this.pool.length : 0,
+      unofferedShare: this.pool.length ? unoffered / this.pool.length : 0,
       retiredTotal: retired, exitedTotal: exited,
       hires: f.hires, leavers: f.leavers, layoffs: f.layoffs, retired: f.retired, grads: f.grads, promos: f.promos, exits: f.exits,
       hiresGrad: f.bySource[S.GRAD], hiresSwitcher: f.bySource[S.SWITCHER], hiresLaidOff: f.bySource[S.LAID_OFF],
@@ -793,12 +866,62 @@
     });
   };
 
+  // A pool member nobody has put on a slate in the last 4 quarters.
+  P.unseen = function (a) {
+    var last = this.agents.lastScreenedQ[a];
+    return last === 0 || last - 1 < this.q - 4;
+  };
+  // Screened in the last 4 quarters, but no recruiter got to them with an offer.
+  P.unoffered = function (a) {
+    var last = this.agents.lastOfferedQ[a];
+    return last === 0 || last - 1 < this.q - 4;
+  };
+
+  function gini(counts) {
+    counts.sort(function (x, y) { return x - y; });
+    var sum = 0, weighted = 0, n = counts.length;
+    for (var i = 0; i < n; i++) { sum += counts[i]; weighted += (i + 1) * counts[i]; }
+    return n && sum ? (2 * weighted) / (n * sum) - (n + 1) / n : 0;
+  }
+
+  // Who in the pool is being looked at. Buckets by idle time, status and
+  // region; Gini of screenings in the current search spell.
+  P.visibility = function () {
+    var A = this.agents;
+    var mk = function (label) { return { label: label, n: 0, unseen: 0, unoffered: 0, screens: 0, offers: 0 }; };
+    var buckets = [mk('0–1 qtrs idle'), mk('2–3 qtrs'), mk('4–7 qtrs'), mk('8+ qtrs')];
+    var status = {}; status[S.GRAD] = mk('New grads'); status[S.SWITCHER] = mk('Switching jobs'); status[S.LAID_OFF] = mk('Laid off');
+    var regions = {}, counts = [], offerCounts = [], total = mk('Everyone looking');
+    for (var p = 0; p < this.pool.length; p++) {
+      var a = this.pool[p], idle = A.idleQ[a], u = this.unseen(a) ? 1 : 0, sc = A.screenedSpell[a], of = A.offeredSpell[a];
+      var uo = this.unoffered(a) ? 1 : 0;
+      var region = this.cities[A.city[a]].region;
+      var groups = [total, buckets[idle <= 1 ? 0 : idle <= 3 ? 1 : idle <= 7 ? 2 : 3], status[A.status[a]],
+        regions[region] || (regions[region] = mk(region))];
+      groups.forEach(function (g) { g.n++; g.unseen += u; g.unoffered += uo; g.screens += sc; g.offers += of; });
+      counts.push(sc);
+      offerCounts.push(of);
+    }
+    var share = function (g) {
+      g.unseenShare = g.n ? g.unseen / g.n : 0;
+      g.unofferedShare = g.n ? g.unoffered / g.n : 0;
+      g.avgScreens = g.n ? g.screens / g.n : 0;
+      g.avgOffers = g.n ? g.offers / g.n : 0;
+      return g;
+    };
+    return {
+      total: share(total), gini: gini(counts), offerGini: gini(offerCounts), buckets: buckets.map(share),
+      status: [status[S.GRAD], status[S.SWITCHER], status[S.LAID_OFF]].map(share),
+      regions: Object.keys(regions).map(function (k) { return share(regions[k]); }).sort(function (x, y) { return y.unseenShare - x.unseenShare; }),
+    };
+  };
+
   // Residents of each city right now.
   P.cityStats = function () {
     var A = this.agents, nC = this.cities.length, self = this;
     var rows = this.cities.map(function (c, i) {
       return { id: i, name: c.name, region: c.region, pop: c.pop, employed: 0, poolGrad: 0, poolSwitcher: 0, poolLaidOff: 0,
-        retired: 0, compSum: 0, commuteSum: 0, employers: {} };
+        retired: 0, compSum: 0, commuteSum: 0, employers: {}, unseen: 0 };
     });
     for (var a = 0; a < A.n; a++) {
       var row = rows[A.city[a]], st = A.status[a];
@@ -808,10 +931,13 @@
         var co = A.company[a];
         row.commuteSum += self.dist[A.city[a]][self.companies[co].city];
         row.employers[co] = (row.employers[co] || 0) + 1;
-      } else if (st === S.GRAD) row.poolGrad++;
-      else if (st === S.SWITCHER) row.poolSwitcher++;
-      else if (st === S.LAID_OFF) row.poolLaidOff++;
-      else if (st === S.RETIRED) row.retired++;
+      } else if (st === S.RETIRED) row.retired++;
+      else if (st !== S.EXITED) {
+        if (st === S.GRAD) row.poolGrad++;
+        else if (st === S.SWITCHER) row.poolSwitcher++;
+        else row.poolLaidOff++;
+        if (self.unseen(a)) row.unseen++;
+      }
     }
     rows.forEach(function (r) {
       r.pool = r.poolGrad + r.poolSwitcher + r.poolLaidOff;
