@@ -4,10 +4,11 @@ BAYWORK — WHO THE BAY AREA ENGINEERING MARKET FAILS, AND FIVE WAYS TO HELP THE
 SUMMARY
 -------
 
-- What I built: I extended the BayWork simulator without changing its rules. With every new feature off, it gives exactly the original results.
-- The five features: Fair-Chance Slates, Warm Handoff, Bay Corridors, Retire-to-Mentor, and a Policy Lab that compares them persona by persona.
+- What I built: I extended the BayWork simulator without changing its rules. With every new setting off, it gives exactly the original results.
+- Five uplift features: Fair-Chance Slates, Warm Handoff, Bay Corridors, Retire-to-Mentor, and a Policy Lab that compares policies persona by persona.
+- Two scenarios the brief asked for: outsourcing to India and AI automation (70% AI / 30% human). They're what-ifs, not improvements.
 - Main result: under the brief's 5% hiring cap, total hires barely move. The policies decide who waits for a job, not how many wait.
-- Biggest wins: new grads placed within 4 quarters 39% → 77%, and laid-off people 68% → 86%. Experienced job-seekers and job switchers pay for it, and I show that.
+- Biggest numbers: new grads placed within 4 quarters 39% → 77% with Fair-Chance. In the AI 70/30 scenario, unemployment goes from 28% to 54%.
 - See it in 3 minutes: open index.html in Chrome and press ▶ 3-minute demo at the top of the sidebar.
 
 BayWork simulates hiring, attrition, layoffs, graduations, retirements and pay across the Bay Area's engineering
@@ -25,26 +26,28 @@ Open index.html in Chrome. There's no build step, no install and no network acce
 The 3-minute tour
 1. Press ▶ 3-minute demo. It loads the All uplift preset (all four policies on) and compares it with the original
    model in the Policy Lab, same seed. Read the Who gains / Who loses lines.
-2. Use the Presets in the sidebar to switch on one feature at a time. "What to look at" under the presets says where
-   each feature shows up.
+2. Use the Presets in the sidebar to switch on one feature at a time: Original, All uplift, Fair-Chance, Warm Handoff,
+   Handoff cap-exempt, Bay Corridors, Retire-to-Mentor, and the two scenarios, Outsourcing and AI 70/30. "What to
+   look at" under the presets says where each one shows up.
+3. For a scenario, choose its preset and open Policy Lab → Compare to see which groups lose.
 
 Original controls (unchanged): Start/Stop (or [Space]), +1 quarter, speed, a zoomable map (click an HQ or
 a city), Raw data tables with CSV download, and an end-of-run Summary.
 
 New in this version
-- Uplift features: a sidebar group. Every feature is off by default.
+- Uplift features and Scenarios: two sidebar groups. Everything is off by default.
 - Policy Lab (top bar): a scorecard, baseline-vs-policy compare, stress tests and an autopilot.
 - Visibility tab on the dashboard: who is being screened, and who actually gets offers.
 - Bay Corridors bar under the map: draw or suggest shuttle corridors.
-- Two new KPI cards: "Re-employed same quarter" and "Mentors active".
+- New KPI cards: "Re-employed same quarter", "Mentors active", "Roles outsourced to India" and "Roles automated by AI".
 
 Tests and tools (Node 18 or later, no dependencies)
 
-    node test/engine.test.js                 27 tests (about 2–3 minutes)
+    node test/engine.test.js                 29 tests (about 3 minutes)
     node tools/baseline.js                   persona metrics for one run (seed 42, 5 years, 200 companies)
     node tools/compare.js '{}' '{"fairScreening":1}'          baseline vs. a policy on seeds 42, 7, 123
     node tools/compare.js --small '{}' '{"warmHandoff":1}'    fast scale: 100 companies, 3 years, seeds 42 and 7
-    sh tools/final-tables.sh                 regenerates every table in this README (output in tools/results/)
+    sh tools/final-tables.sh                 regenerates every table in this README, scenarios included (output in tools/results/)
     node tools/headless.js                   opens index.html in headless Chrome, clicks through it, reports console errors
 
 ---
@@ -108,7 +111,9 @@ How every feature was built. Each feature was tested and compared against the ba
 3. I fixed the design.
 4. I re-measured it at full scale (200 companies, 5 years, seeds 42, 7 and 123) for the tables below.
 
-Every feature is off by default and uses no random draws when off. So the original runs are reproduced exactly; a test
+The two scenarios went through the same steps, without tuning rounds (one full-scale measurement).
+
+Every feature and scenario is off by default and uses no random draws when off. So the original runs are reproduced exactly; a test
 checks this against an untouched copy of the original engine.
 
 ---
@@ -473,7 +478,101 @@ Under the brief's cap, these policies decide who waits. Only changing the cap de
 
 ---
 
-5. ASSUMPTIONS (EVERY INVENTED NUMBER)
+5. SCENARIOS: OUTSOURCING AND AI
+--------------------------------
+
+These are scenarios requested in the brief, not uplift features. They ask "what if?", and the answer is mostly bad
+news for US job-seekers. Both are deterministic: they use fixed rules, not random draws.
+
+Outsourcing to India
+~~~~~~~~~~~~~~~~~~~~
+
+What the brief asked: move hard-to-fill roles to India at 2.5 hires per US role.
+
+What it does (outsourceOn)
+- After planning and before hiring, each quarter, a US req that has been unfilled for more than outsourceAfterQ (1)
+  quarters can be outsourced.
+- outsourceSharePct (100%) sets the share of eligible reqs taken. It's every Nth req, not random.
+- An outsourced req is closed in the US. The seat is eliminated, like a laid-off seat, so it isn't reopened.
+- It's replaced by outsourceRatio (2.5) India hires. India hires are not in the US pool, the US cap or US
+  unemployment.
+- The event log records "Role outsourced to India".
+
+AI automation (70% AI / 30% human)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+What the brief asked: a future where AI does 70% of the work and people do 30%.
+
+How I read it: from now on, aiSharePct% of newly opened US roles (growth roles and replacement roles) are done by
+AI and closed instead of hired. The rest stay open for people.
+- The share ramps up evenly from 0 to the target over aiRampQuarters (8).
+- The choice of which roles go to AI uses a running counter, not a random draw.
+- Existing employees aren't laid off. I didn't build the optional AI-layoff switch.
+- The event log records "Role automated".
+
+Key results (full scale: 200 companies, 5 years, seeds 42, 7, 123)
+
+| Measure | Baseline | Outsourcing | AI 70/30 | Both |
+|---|----|----|----|----|
+| US unemployment | 28.1% | 28.2% | 54.2% | 54.7% |
+| New grads placed ≤4Q | 39.2% | 41.1% | 18.7% | 17.7% |
+| Laid off placed ≤4Q | 67.7% | 67.6% | 40.4% | 39.7% |
+| Large / startup headcount change | −22.7% / +31.5% | −22.7% / +27.0% | −50.4% / −72.7% | −50.9% / −74.5% |
+| India headcount | 0 | 110,993 | 0 | 5,632 |
+| US roles automated by AI | 0 | 0 | 135,859 | 135,148 |
+
+Full table (all metrics, per-seed changes):
+
+Command: node tools/compare.js '{}' '{"outsourceOn":1}' '{"aiSharePct":70}' '{"outsourceOn":1,"aiSharePct":70}'
+
+| Metric | Baseline | Outsourcing | Δ vs baseline (seeds 42 / 7 / 123) | AI 70/30 | Δ vs baseline (seeds 42 / 7 / 123) | Both | Δ vs baseline (seeds 42 / 7 / 123) |
+|---|----|----|----|----|----|----|----|
+| Unemployment at end | 28.1% | 28.2% | +0.1pt (+0.1pt +0.1pt +0.0pt) | 54.2% | +26.1pt (+26.1pt +26.1pt +26.0pt) | 54.7% | +26.5pt (+26.7pt +26.5pt +26.3pt) |
+| NET placed ≤4Q, all cohorts (count) | 155,548 | 154,985 | −563 (−759 −356 −574) | 76,971 | −78,577 (−79,146 −78,424 −78,162) | 74,892 | −80,657 (−81,165 −80,706 −80,099) |
+| NET placed ≤4Q, all cohorts (share) | 59.5% | 59.2% | −0.2pt (−0.2pt −0.3pt −0.2pt) | 32.4% | −27.0pt (−27.2pt −27.0pt −26.9pt) | 31.7% | −27.8pt (−28.0pt −27.9pt −27.5pt) |
+| New grads placed ≤4Q | 39.2% | 41.1% | +1.9pt (+2.2pt +2.0pt +1.5pt) | 18.7% | −20.5pt (−20.7pt −20.4pt −20.4pt) | 17.7% | −21.5pt (−21.6pt −21.6pt −21.2pt) |
+| Laid off placed ≤4Q | 67.7% | 67.6% | −0.1pt (−0.4pt +0.1pt −0.0pt) | 40.4% | −27.4pt (−27.8pt −27.2pt −27.1pt) | 39.7% | −28.0pt (−28.4pt −28.0pt −27.8pt) |
+| Experienced 10y+ placed ≤4Q | 61.4% | 59.5% | −1.9pt (−1.9pt −2.1pt −1.8pt) | 32.4% | −29.0pt (−29.3pt −28.9pt −28.8pt) | 31.8% | −29.6pt (−29.9pt −29.7pt −29.2pt) |
+| Switchers placed ≤4Q | 60.5% | 59.8% | −0.7pt (−0.7pt −0.8pt −0.6pt) | 32.7% | −27.9pt (−27.9pt −27.9pt −27.7pt) | 32.0% | −28.6pt (−28.7pt −28.7pt −28.3pt) |
+| Pool idle 4+ quarters | 66.2% | 66.1% | −0.1pt (−0.4pt +0.3pt −0.2pt) | 83.7% | +17.4pt (+17.4pt +17.7pt +17.2pt) | 83.9% | +17.6pt (+17.6pt +17.9pt +17.4pt) |
+| Large-company headcount change | -22.7% | -22.7% | −0.0pt (−0.0pt −0.1pt +0.0pt) | -50.4% | −27.7pt (−27.8pt −27.7pt −27.6pt) | -50.9% | −28.2pt (−28.4pt −28.2pt −28.0pt) |
+| Startup headcount change | 31.5% | 27.0% | −4.6pt (−5.5pt −3.3pt −4.9pt) | -72.7% | −104.3pt (−104.8pt −104.8pt −103.2pt) | -74.5% | −106.0pt (−106.6pt −105.2pt −106.2pt) |
+| Unfilled reqs at end | 43,716 | 8,464 | −35,252 (−34,893 −35,198 −35,665) | 285 | −43,431 (−43,189 −43,256 −43,848) | 256 | −43,460 (−43,182 −43,300 −43,899) |
+| Total hires | 220,168 | 219,970 | −198 (−138 −278 −178) | 110,220 | −109,949 (−110,253 −109,974 −109,619) | 107,724 | −112,444 (−112,912 −112,492 −111,928) |
+| India headcount (outsourced roles) | 0 | 110,993 | +110,993 (+109,675 +111,625 +111,680) | 0 | ±0 (±0 ±0 ±0) | 5,632 | +5,632 (+5,973 +5,545 +5,378) |
+| US roles outsourced | 0 | 44,397 | +44,397 (+43,870 +44,650 +44,672) | 0 | ±0 (±0 ±0 ±0) | 2,253 | +2,253 (+2,389 +2,218 +2,151) |
+| US roles automated by AI | 0 | 0 | ±0 (±0 ±0 ±0) | 135,859 | +135,859 (+135,662 +135,787 +136,127) | 135,148 | +135,148 (+135,030 +134,916 +135,499) |
+
+How I tested it
+- Tests:
+  - "Scenarios: outsourcing and AI keep the books, caps and startup max; deterministic per seed" checks every quarter:
+    lists stay consistent, no seat is both outsourced and filled, no outsourced req stays open, the cap and the startup
+    max hold, the AI share stays at or below 70%, India headcount = 2.5 × outsourced reqs, there's one event per
+    outsourced req, and two runs with the same seed are identical.
+  - "Scenarios: the AI share ramps and never exceeds aiSharePct; outsourcing every Nth is exact".
+  - The identical-to-original test (seeds 42, 7, 123) passes with both off.
+- Before integrating: a small-scale check (100 companies, 3 years, seed 42). Outsourcing: unemployment 19.1% → 19.0%.
+  AI 70/30: unemployment 19.1% → 34.4%.
+- Full scale: the table above, one measurement as requested, no tuning.
+- Decision: kept both as clearly labelled scenarios in their own sidebar group, with KPI cards and Policy Lab rows.
+  They're not offered as improvements.
+
+Verdict, honestly
+- AI 70/30 is the harshest change in the whole model.
+  - US unemployment nearly doubles (28% → 54%), and total US hires halve (220k → 110k).
+  - Every job-seeking group loses 20–29 points placed ≤4Q: new grads, laid-off people, switchers and experienced
+    candidates.
+  - Large companies shrink by half, and startups by almost three-quarters. Their high turnover means most of their
+    roles are reopened, and 70% of those go to AI.
+- Outsourcing barely moves US unemployment (+0.1 points), but not because it's harmless.
+  - It closes 44k US roles that the 5% cap was already leaving unfilled. That's why the US hires don't change.
+  - The roles disappear from the US for good, startups lose 4.6 points, and experienced candidates lose 1.9.
+  - If the cap were lifted, those would have been US jobs.
+- Both together: about the same as AI alone. AI takes most new roles before they're old enough to outsource.
+
+---
+
+6. ASSUMPTIONS (EVERY INVENTED NUMBER)
 --------------------------------------
 
 | Assumption | Value | Setting |
@@ -487,12 +586,16 @@ Under the brief's cap, these policies decide who waits. Only changing the cap de
 | Boom | funded growth ×2, hiring cap ×1.5, for 4 quarters | shock = 2 |
 | Fit-rank idle boost | up to +30% at 8+ quarters looking (tuned in 2 rounds) | fairIdleBoostPct |
 | Persona score scales | e.g. large companies: −25% headcount = 0, +25% = 100 | js/metrics.js |
+| India hires per outsourced role | 2.5 (from the brief's budget statement) | outsourceRatio |
+| India pay and cost | Not modelled, so no cost claims are made | — |
+| AI share of new roles | 70% AI / 30% human: a scenario target, not a prediction | aiSharePct |
+| AI ramp | rises evenly over 8 quarters | aiRampQuarters |
 
-The original model's own calibrated values (pay bands, acceptance curve, slate size) are unchanged (section 9).
+The original model's own calibrated values (pay bands, acceptance curve, slate size) are unchanged (section 10).
 
 ---
 
-6. LIMITATIONS AND HONEST NEGATIVES
+7. LIMITATIONS AND HONEST NEGATIVES
 -----------------------------------
 
 - The cap limits everything. Fair-Chance, the cap-counting Warm Handoff and Bay Corridors mainly move jobs between
@@ -507,6 +610,10 @@ The original model's own calibrated values (pay bands, acceptance curve, slate s
 - What comes from assumptions or levers:
   - Retire-to-Mentor's grad-retention gain is the assumed 30% cut.
   - The cap-exempt handoff's big gain comes from bypassing the cap.
+- Scenarios make things worse, as expected:
+  - AI 70/30: US unemployment 28% → 54%, every job-seeking group −20 to −29 points, startups −73%.
+  - Outsourcing: 44k US roles leave for good; unemployment barely moves only because the cap left those roles empty.
+  - Both scenarios were measured once, with no tuning.
 - Evidence: three seeds at full scale; tuning on two seeds at small scale. The seeds agree closely, but it's one model
   with hand-set values.
 - Not modelled (as in the original): moving house, remote work, growth plans that react to the market. Distance is
@@ -514,7 +621,7 @@ The original model's own calibrated values (pay bands, acceptance curve, slate s
 
 ---
 
-7. HOW AI WAS USED
+8. HOW AI WAS USED
 ------------------
 
 I used an AI coding assistant for development and prototyping: reading the code, writing measurement scripts and tests,
@@ -532,7 +639,7 @@ Considered and dropped
 
 ---
 
-8. FURTHER IMPROVEMENTS
+9. FURTHER IMPROVEMENTS
 -----------------------
 
 The current work is complete and runs end to end. These are the extensions I'd add next:
@@ -542,13 +649,16 @@ The current work is complete and runs end to end. These are the extensions I'd a
 - Persona-specific policies for more groups, for example a re-entry path for experienced candidates, the group
   Fair-Chance asks the most of.
 - Calibrating assumed values (the mentor quit cut, corridor cost, shock multipliers) against real data.
+- India cost and wage modelling, so the outsourcing scenario can say what it saves and what it costs.
+- AI that helps people rather than replacing them, for example raising each engineer's output instead of closing
+  roles.
 - Remote work and moving house, to test whether location still drives the regional gap.
 - A finer autopilot search at full scale, with more levels per feature.
 
 ---
 
-9. THE ORIGINAL MODEL (UNCHANGED)
----------------------------------
+10. THE ORIGINAL MODEL (UNCHANGED)
+----------------------------------
 
 Map. About 50 cities from San Rafael and Concord to Los Gatos and Pleasanton, with 2020 Census populations.
 
@@ -588,8 +698,8 @@ How a hire happens.
 - Half of manager vacancies are filled from within.
 - People looking for work lower their ask 2% a quarter.
 
-Quarter order. Raises (Q1), retirements, voluntary exits, layoffs, graduates, growth plan, (Warm Handoff), hiring,
-then the pool ages.
+Quarter order. Raises (Q1), retirements, voluntary exits, layoffs, graduates, growth plan, (outsourcing), *(Warm
+Handoff), hiring, then the pool ages. (AI automation)* applies whenever a role is opened.
 
 Interpretations (original, still valid)
 - "The remaining 1%." Read as the net 1% of new supply each year (3% grads in, 2% retiring).
@@ -600,20 +710,20 @@ Interpretations (original, still valid)
 
 ---
 
-10. FILES
+11. FILES
 ---------
 
     index.html               page (presets and demo, Policy Lab button, corridor bar)
     styles.css               light + dark themes, responsive
     js/data/*.js             cities, geography, the 500 companies (unchanged)
-    js/engine.js             the simulation (no DOM), with the four opt-in features, stress shocks and visibility tracking
+    js/engine.js             the simulation (no DOM), with the four opt-in features, two scenarios, stress shocks and visibility tracking
     js/metrics.js            NEW persona metrics and scorecard, shared by the browser and Node
     js/ui/lab.js             NEW Policy Lab
     js/ui/map.js             map; new corridor layer and drawing, warm-handoff arcs
     js/ui/overlays.js        detail windows; new timeline events
     js/ui/charts.js, insights.js   unchanged
-    js/app.js                controls and dashboard; new Uplift group, Visibility tab, KPIs, corridors, presets
-    test/engine.test.js      27 tests: the original 16, identical-to-original, and each feature's rules
+    js/app.js                controls and dashboard; new Uplift and Scenarios groups, Visibility tab, KPIs, corridors, presets
+    test/engine.test.js      29 tests: the original 16, identical-to-original, each feature's rules, and the scenarios
     test/fixtures/engine.original.js   the engine exactly as provided
     tools/                   metrics, baseline, compare, final tables, headless check, README.txt generator
     tools/results/           the measured outputs quoted in this README
