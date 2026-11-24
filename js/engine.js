@@ -78,6 +78,10 @@
     fairRotationPct: 20,     // share of the slate reserved when fairRotation is on
     fairRankDistance: 0,     // 1 = the fit rank also includes the commute term of P(accept) (widens regional gaps)
     fairIdleBoostPct: 30,    // fit-rank boost for idle time: up to +this% at 8+ idle quarters
+    // Stress tests (Policy Lab). The multipliers are ASSUMPTIONS, not estimates.
+    shock: 0,                // 0 none · 1 recession (layoffs ×2, growth frozen) · 2 boom (growth ×2, cap ×1.5)
+    shockStartQ: 4,          // first shocked quarter (0-based)
+    shockQuarters: 4,
   };
 
   var START_YEAR = 2027;
@@ -183,6 +187,9 @@
     cfg.fairRotationPct = Math.max(0, Math.min(50, cfg.fairRotationPct));
     cfg.fairRankDistance = cfg.fairRankDistance ? 1 : 0;
     cfg.fairIdleBoostPct = Math.max(0, Math.min(200, cfg.fairIdleBoostPct));
+    cfg.shock = Math.max(0, Math.min(2, Math.round(cfg.shock)));
+    cfg.shockStartQ = Math.max(0, Math.round(cfg.shockStartQ));
+    cfg.shockQuarters = Math.max(1, Math.round(cfg.shockQuarters));
     cfg.seed = Math.round(cfg.seed) >>> 0;
     return cfg;
   }
@@ -231,7 +238,7 @@
     this.grow(65536);
   }
   Events.prototype.grow = function (capacity) {
-    var f = { agent: Int32Array, q: Int16Array, type: Uint8Array, company: Int16Array, value: Float32Array };
+    var f = { agent: Int32Array, q: Int16Array, type: Uint8Array, company: Int16Array, value: Float32Array, exp: Float32Array };
     for (var k in f) {
       var next = new f[k](capacity);
       if (this[k]) next.set(this[k]);
@@ -247,6 +254,7 @@
     this.type[i] = type;
     this.company[i] = company;
     this.value[i] = value;
+    this.exp[i] = this.sim ? this.sim.agents.exp[agent] : 0; // years of experience at the event (for persona metrics)
   };
 
   // ------------------------------------------------------------------ simulation
@@ -264,6 +272,7 @@
     this.gradCarry = 0;
     this.agents = new Agents(1024);
     this.events = new Events();
+    this.events.sim = this;
     this.pool = [];
     this.active = [];
     this.series = [];
@@ -300,7 +309,7 @@
         synthetic: u.synthetic, payTier: u.payTier, mult: mult,
         city: cityIndex[u.city], cityName: u.city, engineersData: u.engineers,
         members: [], levelCount: [0, 0, 0, 0, 0, 0, 0], reqs: [], target: 0, startHc: 0,
-        frozen: false, capQ: 0, hiredQ: 0,
+        frozen: false, capQ: 0, hiredQ: 0, fillAgeSum: 0,
         series: { hc: [], hires: [], leavers: [], layoffs: [], retired: [], promos: [], planned: [], cap: [], unfilled: [],
           payroll: [], hireSpend: [], avgComp: [], avgBand: [], commute: [], levels: [] },
         totals: { hires: 0, leavers: 0, layoffs: 0, retired: 0, promos: 0, hireSpend: 0 },
@@ -503,6 +512,12 @@
     return this.series[this.series.length - 1];
   };
 
+  // Stress test window (Policy Lab). Off unless cfg.shock is set.
+  P.shockOn = function (kind) {
+    var cfg = this.cfg;
+    return cfg.shock === kind && this.q >= cfg.shockStartQ && this.q < cfg.shockStartQ + cfg.shockQuarters;
+  };
+
   P.retire = function () {
     var cfg = this.cfg, A = this.agents;
     this.retireCarry += (this.employedCount() + this.pool.length) * cfg.retirePct / 100 / 4;
@@ -578,6 +593,7 @@
     var cfg = this.cfg, A = this.agents, self = this;
     this.companies.forEach(function (c) {
       var rate = (c.kind === 'large' ? cfg.layoffLargePct : cfg.layoffStartupPct) / 100;
+      if (self.shockOn(1)) rate = Math.min(1, rate * 2); // ASSUMPTION: a recession doubles layoffs
       var expected = c.members.length * rate;
       var n = Math.floor(expected) + (self.rand() < expected - Math.floor(expected) ? 1 : 0);
       if (n <= 0) return;
@@ -633,6 +649,8 @@
   P.plan = function (c) {
     var cfg = this.cfg;
     var g = (c.kind === 'large' ? cfg.growthLargePct : cfg.growthStartupPct) / 100;
+    if (this.shockOn(1)) g = 0;        // ASSUMPTION: a recession freezes funded growth
+    else if (this.shockOn(2)) g *= 2;  // ASSUMPTION: a boom doubles it
     c.target *= Math.pow(1 + g, 0.25);
     if (c.kind === 'startup') c.target = Math.min(cfg.startupMax, c.target);
     var want = pyramidForHeadcount(Math.round(c.target), cfg.span);
@@ -652,8 +670,9 @@
   P.hire = function () {
     var cfg = this.cfg;
     var queue = [];
+    var capPct = this.shockOn(2) ? cfg.hireCapPct * 1.5 : cfg.hireCapPct; // ASSUMPTION: a boom lifts the cap 1.5×
     this.companies.forEach(function (c) {
-      c.capQ = Math.max(cfg.hireCapMin, Math.floor(cfg.hireCapPct / 100 * c.members.length));
+      c.capQ = Math.max(cfg.hireCapMin, Math.floor(capPct / 100 * c.members.length));
       c.hiredQ = 0;
       c.plannedQ = c.reqs.length;
       if (c.frozen) return;
@@ -745,19 +764,21 @@
   // percentage point) go to the cheaper offer, then the closer level fit, then
   // the smaller surplus of experience over what the seat needs.
   P.sortByFit = function (slate, c, r) {
-    var cfg = this.cfg, A = this.agents, base = cfg.baseAcceptPct / 100, self = this;
-    var key = {};
-    slate.forEach(function (a) {
-      var ask = A.expect[a], offer = Math.min(r.band, ask);
+    var cfg = this.cfg, A = this.agents, base = cfg.baseAcceptPct / 100, n = slate.length;
+    var fit = [], cost = [], lvl = [], surplus = [], order = [];
+    for (var i = 0; i < n; i++) {
+      var a = slate[i], ask = A.expect[a], offer = Math.min(r.band, ask);
       var p = base * Math.pow(offer / ask, cfg.compElasticity);
-      if (cfg.fairRankDistance) p *= Math.pow(2, -self.dist[A.city[a]][c.city] / cfg.nearbyMiles);
+      if (cfg.fairRankDistance) p *= Math.pow(2, -this.dist[A.city[a]][c.city] / cfg.nearbyMiles);
       if (cfg.fairIdleBoostPct) p *= 1 + cfg.fairIdleBoostPct / 100 * Math.min(A.idleQ[a], 8) / 8;
-      key[a] = [Math.round(p * 100), offer, Math.abs(A.level[a] - r.level), A.exp[a] - MIN_EXP[r.level]];
+      fit.push(Math.round(p * 100)); cost.push(offer); lvl.push(Math.abs(A.level[a] - r.level)); surplus.push(A.exp[a] - MIN_EXP[r.level]);
+      order.push(i);
+    }
+    order.sort(function (x, y) {
+      return fit[y] - fit[x] || cost[x] - cost[y] || lvl[x] - lvl[y] || surplus[x] - surplus[y] || slate[x] - slate[y];
     });
-    slate.sort(function (x, y) {
-      var kx = key[x], ky = key[y];
-      return ky[0] - kx[0] || kx[1] - ky[1] || kx[2] - ky[2] || kx[3] - ky[3] || x - y;
-    });
+    var sorted = order.map(function (i) { return slate[i]; });
+    for (var j = 0; j < n; j++) slate[j] = sorted[j];
   };
 
   P.onboard = function (a, c, r, offer, miles) {
@@ -777,6 +798,7 @@
     flow.hireComp += offer;
     flow.hireCommute += miles;
     flow.fillAge += r.age;
+    c.fillAgeSum += r.age;
     flow.bySource[source]++;
     var key = A.city[a] + ':' + c.city;
     flow.pairs[key] = (flow.pairs[key] || 0) + 1;

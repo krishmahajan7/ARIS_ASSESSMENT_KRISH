@@ -593,6 +593,8 @@
 
   // ---------------------------------------------------------------- summary
 
+  O.lab = function (tab) { this.app.lab().open(this, tab); };
+
   O.summary = function () {
     var sim = this.sim();
     this.show(function () { return root.BWInsights.render(sim); }, { kind: 'summary', args: [] });

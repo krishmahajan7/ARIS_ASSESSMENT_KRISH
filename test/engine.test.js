@@ -277,4 +277,25 @@ test('visibility: per-spell counts and shares stay in range', () => {
   sim.pool.forEach((a) => assert(A.screenedSpell[a] <= A.screened[a] || A.screened[a] === 65535));
 });
 
+test('stress tests: shock off is the original; a recession doubles layoffs only in its window', () => {
+  sameAsOriginal({ companies: 60, years: 2, seed: 11, shockStartQ: 2, shockQuarters: 3 }, 'shock settings with shock 0');
+  const calm = make({ companies: 100, years: 3 }).runToEnd(), rec = make({ companies: 100, years: 3, shock: 1, shockStartQ: 4, shockQuarters: 4 }).runToEnd();
+  // Layoff rounds happen in Q1: quarter index 0 (outside), 4 (inside), 8 (outside).
+  assert.strictEqual(rec.series[1].layoffs, calm.series[1].layoffs, 'before the window');
+  assert(rec.series[5].layoffs > calm.series[5].layoffs * 1.6, `recession layoffs ${rec.series[5].layoffs} vs ${calm.series[5].layoffs}`);
+  const boom = make({ companies: 100, years: 3, shock: 2, shockStartQ: 4, shockQuarters: 4 }).runToEnd();
+  assert(boom.series[8].hires > calm.series[8].hires, 'boom hires more');
+  boom.companies.forEach((c) => c.series.hires.forEach((h, i) => assert(h <= c.series.cap[i], `${c.name} over the boom cap`)));
+});
+
+test('metrics: one implementation for browser and tools; compare runs are deterministic', () => {
+  const T = require('../tools/metrics.js');
+  const a = T.runConfig({ companies: 60, years: 2, seed: 9, fairScreening: 1 }), b = T.runConfig({ companies: 60, years: 2, seed: 9, fairScreening: 1 });
+  assert.deepStrictEqual(M.personaMetrics(a.sim, W), a.metrics, 'js/metrics.js and tools/metrics.js agree');
+  assert.deepStrictEqual(a.metrics, b.metrics, 'same seed, same metrics');
+  const sc = M.scorecard(a.metrics, { grads: 2 });
+  assert.strictEqual(sc.rows.length, M.PERSONAS.length);
+  sc.rows.forEach((r) => assert(r.score >= 0 && r.score <= 100, r.name));
+});
+
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

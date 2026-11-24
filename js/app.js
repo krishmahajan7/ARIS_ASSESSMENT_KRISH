@@ -64,7 +64,9 @@
   var state = {
     cfg: Object.assign({}, W.DEFAULTS),
     sim: null, status: 'ready', speed: 2, timer: null, chartTab: 'market', cityRows: null,
+    corridors: [], // Bay Corridors: [{ from, to, cutPct, spillMiles }], outside the numeric settings
   };
+  var UPLIFT_KEYS = [];
   var inputs = {};
 
   // ---------------------------------------------------------------- controls
@@ -102,6 +104,7 @@
             + (c.hint ? '<p class="ctl-hint">' + c.hint + '</p>' : '') + '</div>';
         }
         inputs[c.key] = { def: c };
+        if (g.group === 'Uplift features') UPLIFT_KEYS.push(c.key);
       });
       html += '</details>';
     });
@@ -167,7 +170,7 @@
 
   function newRun() {
     stopTimer();
-    state.sim = new W.WorkforceSim(state.cfg, DATA);
+    state.sim = new W.WorkforceSim(state.cfg, DATA, { corridors: state.corridors });
     state.cityRows = state.sim.cityStats();
     map.setSim(state.sim);
     map.update(state.cityRows);
@@ -427,10 +430,23 @@
     },
   });
 
+  var lab = null;
   var overlays = new window.BWOverlays({
     overlay: $('overlay'), sheet: $('sheet'),
     app: {
       sim: function () { return state.sim; },
+      lab: function () {
+        if (!lab) {
+          lab = new window.BWLab({
+            sim: function () { return state.sim; },
+            cfg: function () { return Object.assign({}, state.cfg); },
+            extras: function () { return { corridors: state.corridors.slice() }; },
+            upliftSettings: upliftSettings,
+            applyPolicy: applyPolicy,
+          });
+        }
+        return lab;
+      },
       hideTip: hideTip,
       selectCompany: function (c) { map.select(c); map.focusOn(c, 2); renderFocus(); },
       applyPatch: function (patch) {
@@ -443,6 +459,33 @@
     },
   });
 
+  // The uplift settings that differ from the original model, for labels.
+  function upliftSettings() {
+    var out = {};
+    UPLIFT_KEYS.forEach(function (k) {
+      var on = { fairIdleBoostPct: 'fairScreening', fairRankDistance: 'fairScreening', fairRotationPct: 'fairRotation' }[k];
+      if (on && !state.cfg[on]) return; // a knob of a feature that is off doesn't change anything
+      if (state.cfg[k] !== W.DEFAULTS[k] || (!on && state.cfg[k])) out[k] = state.cfg[k];
+    });
+    if (state.corridors.length) out.corridors = state.corridors.slice();
+    return out;
+  }
+
+  // Load a policy (from presets or the autopilot) into the sidebar and reset the run.
+  function applyPolicy(patch) {
+    if (locked()) stop();
+    overlays.close();
+    UPLIFT_KEYS.forEach(function (k) { state.cfg[k] = W.DEFAULTS[k]; });
+    state.corridors = [];
+    Object.keys(patch).forEach(function (k) {
+      if (k === 'corridors') {
+        state.corridors = patch[k] === 'suggest' && state.sim.suggestCorridors ? new W.WorkforceSim(state.cfg, DATA).suggestCorridors(3) : (Array.isArray(patch[k]) ? patch[k].slice() : []);
+      } else if (inputs[k]) state.cfg[k] = clamp(inputs[k].def, patch[k]);
+    });
+    syncControls();
+    newRun();
+  }
+
   // Opening a detail view pauses the run so the numbers hold still.
   function openOverlay(fn) {
     if (state.status === 'running') stop();
@@ -454,6 +497,7 @@
   $('btn-step').addEventListener('click', function () { if (state.status !== 'running') stepOnce(); });
   $('btn-reset').addEventListener('click', function () { overlays.close(); newRun(); });
   $('btn-data').addEventListener('click', function () { openOverlay(function () { overlays.data('employees'); }); });
+  $('btn-lab').addEventListener('click', function () { openOverlay(function () { overlays.lab(); }); });
   $('btn-summary').addEventListener('click', function () { openOverlay(function () { overlays.summary(); }); });
   $('btn-defaults').addEventListener('click', function () {
     if (locked()) return;

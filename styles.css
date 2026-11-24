@@ -499,3 +499,44 @@ table.data tr:last-child td { border-bottom: 0; }
   .bar-row { grid-template-columns: 100px 1fr 50px; }
 }
 #chart-tabs .tab { white-space: nowrap; font-size: 11.5px; padding: 0 4px; }
+
+/* ------------------------------------------------------------------ Policy Lab */
+.lab-btn { border-color: var(--ink-2); font-weight: 650; }
+.lab .lab-tabs { max-width: 620px; }
+.lab-empty { padding: 30px 0; text-align: center; }
+.lab-overall { display: flex; gap: 18px; align-items: flex-end; justify-content: space-between; margin: 4px 0 12px; flex-wrap: wrap; }
+.lab-overall .big { font-size: 24px; font-weight: 680; letter-spacing: -0.01em; }
+.lab-overall p { max-width: 70ch; font-size: 12px; text-align: right; }
+.lab-bar { display: grid; grid-template-columns: 1fr 30px; gap: 8px; align-items: center; }
+.lab-bar .track { height: 10px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.lab-bar .fill { height: 100%; border-radius: 0 3px 3px 0; }
+.lab-bar b { font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+table.lab-table tbody tr { cursor: default; }
+table.lab-table td { white-space: normal; }
+table.lab-table tr.lab-loss td { background: var(--bad-wash); }
+.lab-w { white-space: nowrap; }
+.lab-w input { width: 90px; vertical-align: middle; }
+.lab-w span { display: inline-block; width: 34px; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.lab-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.lab-scale { display: flex; gap: 8px; align-items: center; margin-left: auto; font-size: 12px; }
+.lab-scale .seg { height: 26px; padding: 0 8px; font-size: 11.5px; }
+.lab-progress { display: grid; grid-template-columns: 1fr 2fr auto; gap: 12px; align-items: center; padding: 10px 12px; margin-bottom: 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border); font-size: 12.5px; }
+.lab-gl { display: grid; gap: 6px; margin: 10px 0 12px; font-size: 12.5px; }
+.lab-gl > div { padding: 8px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--border); }
+.lab-gl .gain { border-left: 4px solid var(--good); }
+.lab-gl .loss { border-left: 4px solid var(--bad); }
+.lab-gl .net { border-left: 4px solid var(--ink-2); }
+.lab-warn { padding: 8px 10px; border-radius: 8px; background: var(--bad-wash); color: var(--bad); margin: 8px 0; font-size: 12.5px; }
+.lab-verdict { margin: 6px 0; font-size: 13px; }
+.lab-h { font-size: 15px; font-weight: 650; margin: 18px 0 4px; }
+.lab-details { margin-top: 12px; }
+.lab-details summary { cursor: pointer; font-weight: 600; font-size: 12.5px; margin-bottom: 8px; }
+.lab-picks { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 8px; }
+.lab-pick { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: grid; gap: 10px; align-content: start; }
+.lab-pick-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.lab-pick-head .insight-n { display: inline-grid; width: 22px; height: 22px; font-size: 12px; margin-right: 4px; }
+.lab-pick-rows { display: flex; flex-wrap: wrap; gap: 4px; font-size: 11.5px; }
+.lab-pick-rows span { padding: 1px 6px; border-radius: 4px; background: var(--panel-2); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.lab-pick-rows span.pos { background: var(--good-wash); color: var(--good); }
+.lab-pick-rows span.neg { background: var(--bad-wash); color: var(--bad); }
+@media (max-width: 720px) { .lab-progress { grid-template-columns: 1fr; } .lab-scale { margin-left: 0; } }
