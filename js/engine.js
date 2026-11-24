@@ -76,6 +76,8 @@
     fairScreening: 0,        // 1 = offer in order of fit (P(accept)), not experience
     fairRotation: 0,         // 1 = reserve part of each slate for the longest-idle eligible
     fairRotationPct: 20,     // share of the slate reserved when fairRotation is on
+    fairRankDistance: 0,     // 1 = the fit rank also includes the commute term of P(accept) (widens regional gaps)
+    fairIdleBoostPct: 30,    // fit-rank boost for idle time: up to +this% at 8+ idle quarters
   };
 
   var START_YEAR = 2027;
@@ -179,6 +181,8 @@
     cfg.fairScreening = cfg.fairScreening ? 1 : 0;
     cfg.fairRotation = cfg.fairRotation ? 1 : 0;
     cfg.fairRotationPct = Math.max(0, Math.min(50, cfg.fairRotationPct));
+    cfg.fairRankDistance = cfg.fairRankDistance ? 1 : 0;
+    cfg.fairIdleBoostPct = Math.max(0, Math.min(200, cfg.fairIdleBoostPct));
     cfg.seed = Math.round(cfg.seed) >>> 0;
     return cfg;
   }
@@ -745,7 +749,9 @@
     var key = {};
     slate.forEach(function (a) {
       var ask = A.expect[a], offer = Math.min(r.band, ask);
-      var p = base * Math.pow(offer / ask, cfg.compElasticity) * Math.pow(2, -self.dist[A.city[a]][c.city] / cfg.nearbyMiles);
+      var p = base * Math.pow(offer / ask, cfg.compElasticity);
+      if (cfg.fairRankDistance) p *= Math.pow(2, -self.dist[A.city[a]][c.city] / cfg.nearbyMiles);
+      if (cfg.fairIdleBoostPct) p *= 1 + cfg.fairIdleBoostPct / 100 * Math.min(A.idleQ[a], 8) / 8;
       key[a] = [Math.round(p * 100), offer, Math.abs(A.level[a] - r.level), A.exp[a] - MIN_EXP[r.level]];
     });
     slate.sort(function (x, y) {
@@ -921,7 +927,7 @@
     var A = this.agents, nC = this.cities.length, self = this;
     var rows = this.cities.map(function (c, i) {
       return { id: i, name: c.name, region: c.region, pop: c.pop, employed: 0, poolGrad: 0, poolSwitcher: 0, poolLaidOff: 0,
-        retired: 0, compSum: 0, commuteSum: 0, employers: {}, unseen: 0 };
+        retired: 0, compSum: 0, commuteSum: 0, employers: {}, unseen: 0, unoffered: 0 };
     });
     for (var a = 0; a < A.n; a++) {
       var row = rows[A.city[a]], st = A.status[a];
@@ -937,6 +943,7 @@
         else if (st === S.SWITCHER) row.poolSwitcher++;
         else row.poolLaidOff++;
         if (self.unseen(a)) row.unseen++;
+        if (self.unoffered(a)) row.unoffered++;
       }
     }
     rows.forEach(function (r) {

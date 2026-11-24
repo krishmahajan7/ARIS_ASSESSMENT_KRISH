@@ -9,7 +9,8 @@ const T = require('./metrics.js');
 
 const args = process.argv.slice(2);
 const seedArg = args.find((a) => a.startsWith('--seeds='));
-const seeds = seedArg ? seedArg.slice(8).split(',').map(Number) : [42, 7, 123];
+const small = args.includes('--small'); // fast tuning scale: 100 companies, 3 years, seeds 42 and 7
+const seeds = seedArg ? seedArg.slice(8).split(',').map(Number) : small ? [42, 7] : [42, 7, 123];
 const only = args.find((a) => a.startsWith('--rows='));
 const rows = only ? T.ROWS.filter((r) => only.slice(7).split(',').includes(r[0])) : T.ROWS;
 let configs = args.filter((a) => a.trim().startsWith('{')).map((a) => JSON.parse(a));
@@ -17,7 +18,7 @@ if (!configs.length) configs = [{}];
 if (configs.length === 1) configs.unshift({});
 
 const results = configs.map((cfg, ci) => seeds.map((seed) => {
-  const r = T.runConfig(Object.assign({}, cfg, { seed }));
+  const r = T.runConfig(Object.assign(small ? { companies: 100, years: 3 } : {}, cfg, { seed }));
   process.stderr.write(`  config ${ci} seed ${seed}: ${r.ms} ms\n`);
   return r.metrics;
 }));
@@ -25,7 +26,7 @@ const results = configs.map((cfg, ci) => seeds.map((seed) => {
 const mean = (xs) => { const v = xs.filter((x) => x != null && isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 const name = (cfg, i) => i === 0 ? 'A ' + (Object.keys(cfg).length ? JSON.stringify(cfg) : '(defaults)') : String.fromCharCode(65 + i) + ' ' + JSON.stringify(cfg);
 
-console.log('Seeds: ' + seeds.join(', '));
+console.log('Seeds: ' + seeds.join(', ') + (small ? '  (small scale: 100 companies, 3 years)' : ''));
 configs.forEach((cfg, i) => console.log('  ' + name(cfg, i)));
 console.log('');
 const lw = Math.max(...rows.map((r) => r[1].length));

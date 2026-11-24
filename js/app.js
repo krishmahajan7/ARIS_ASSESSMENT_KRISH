@@ -48,6 +48,14 @@
       { key: 'gradQuarter', label: 'Graduates arrive', choice: [[3, 'Q3'], [0, 'Spread']] },
       { key: 'initialPoolPct', label: 'Initially looking', unit: '% of employed', min: 0, max: 15, step: 0.5, decimals: 1 },
     ] },
+    { group: 'Uplift features', note: 'Opt-in policies built on top of the original model. All off = the original simulator, number for number.', items: [
+      { key: 'fairScreening', label: 'Fair-Chance: offer by fit, not seniority', toggle: true,
+        hint: 'Recruiters offer first to the candidate whose ask the seat can best meet, instead of the most experienced. Measured: new grads gain a lot; job-switchers and laid-off people lose a little.' },
+      { key: 'fairIdleBoostPct', label: 'Fit boost for long-idle people', unit: '% at 8+ qtrs', min: 0, max: 100, step: 5, hint: 'Softens the cost to switchers and startups.' },
+      { key: 'fairRankDistance', label: 'Fit rank also weighs commute', toggle: true, hint: 'Off by default: ranking on commute too widened the city unemployment gap by about 9–13 points.' },
+      { key: 'fairRotation', label: 'Reserve slate seats for the longest-idle', toggle: true, hint: 'Measured: long-idle people are already screened, so this did not help on its own. Kept for comparison.' },
+      { key: 'fairRotationPct', label: 'Reserved share of each slate', unit: '%', min: 0, max: 50, step: 5 },
+    ] },
   ];
   var SPEEDS = [0.5, 1, 2, 4, 8];
   var LAYERS = [['hqs', 'Company HQs', 'var(--s-blue)'], ['startups', 'Startups', 'var(--s-aqua)'], ['residents', 'Where engineers live', 'var(--s-orange)'], ['flows', 'Hiring flows', 'var(--s-blue)']];
@@ -75,7 +83,7 @@
   function buildControls() {
     var html = '';
     CONTROLS.forEach(function (g) {
-      html += '<details class="group" open><summary>' + g.group + '</summary>';
+      html += '<details class="group" open><summary>' + g.group + '</summary>' + (g.note ? '<p class="group-note">' + g.note + '</p>' : '');
       g.items.forEach(function (c) {
         var id = 'in-' + c.key;
         var labelHtml = '<label for="' + id + '">' + c.label + (c.sym ? ' <span class="sym">' + c.sym + '</span>' : '') + '</label>';
@@ -250,7 +258,7 @@
       + kpi('Avg commute', fmt.miles(last.avgCommute), '<span>new hires ' + (last.hireCommute != null ? fmt.miles(last.hireCommute) : '—') + ' · start ' + fmt.miles(first.avgCommute) + '</span>');
   }
 
-  var CHART_TABS = [['market', 'Jobs & people'], ['flows', 'Flows'], ['pay', 'Pay & commute']];
+  var CHART_TABS = [['market', 'Jobs & people'], ['flows', 'Flows'], ['pay', 'Pay & commute'], ['vis', 'Visibility']];
 
   function renderCharts() {
     var s = state.sim.series, labels = s.map(function (x) { return x.label; });
@@ -292,6 +300,8 @@
             { name: 'New grads', color: 'var(--s-yellow)', values: fpick('hiresGrad') },
           ],
         }) : emptyChart());
+    } else if (state.chartTab === 'vis') {
+      html = visibilityPanel(s, labels, pick, block);
     } else {
       html = block('Pay', 'Incumbents get the raise; seats grow slower.', Charts.lineChart({
         labels: labels, label: 'Average comp', yFormat: fmt.money, zero: false,
@@ -310,6 +320,31 @@
         }));
     }
     $('chart-body').innerHTML = html;
+  }
+  // Who in the pool is being looked at: on a slate at all, and reached with an offer.
+  function visibilityPanel(s, labels, pick, block) {
+    var v = state.sim.visibility();
+    var rowsOf = function (groups) {
+      return '<div class="bars vis-bars">' + groups.map(function (g) {
+        return '<div class="bar-row"><span>' + esc(g.label) + ' <span class="muted">' + fmt.k(g.n) + '</span></span>'
+          + '<div class="track" data-tip="' + Charts.attr('<div class="tt-title">' + esc(g.label) + '</div><div class="tt-row">Looking<b>' + fmt.int(g.n) + '</b></div><div class="tt-row">Not on any slate, 4 qtrs<b>' + fmt.pct(g.unseenShare) + '</b></div><div class="tt-row">No offer, 4 qtrs<b>' + fmt.pct(g.unofferedShare) + '</b></div><div class="tt-row">Slates this search<b>' + g.avgScreens.toFixed(1) + '</b></div><div class="tt-row">Offers this search<b>' + g.avgOffers.toFixed(1) + '</b></div>') + '">'
+          + '<div class="fill" style="width:' + (g.unofferedShare * 100).toFixed(1) + '%;background:var(--s-red)"></div></div>'
+          + '<div class="v">' + fmt.pct(g.unofferedShare, 0) + '</div></div>';
+      }).join('') + '</div>';
+    };
+    if (!v.total.n) return '<p class="muted" style="padding:28px 0;text-align:center">Nobody is looking for work.</p>';
+    return '<div class="vis-head"><div><b>' + fmt.pct(v.total.unofferedShare) + '</b><span>got no offer in 4 qtrs</span></div>'
+      + '<div><b>' + fmt.pct(v.total.unseenShare) + '</b><span>not on any slate</span></div>'
+      + '<div><b>' + v.offerGini.toFixed(2) + '</b><span>Gini of offers</span></div></div>'
+      + '<p class="chart-sub" style="margin:6px 0 10px">Being screened is not the bottleneck: almost everyone lands on slates. What differs is whether a recruiter gets to you with an offer before someone ahead of you accepts. Bars: share with no offer in the last 4 quarters (hover for detail). Gini of screenings ' + v.gini.toFixed(2) + '.</p>'
+      + block('By status', '', rowsOf(v.status))
+      + block('By time looking', '', rowsOf(v.buckets))
+      + block('By region', '', rowsOf(v.regions))
+      + block('No offer in 4 quarters, over time', 'Share of everyone looking.', Charts.lineChart({
+        labels: labels, label: 'Share with no offer', yFormat: function (x) { return fmt.pct(x, 0); }, height: 120,
+        series: [{ name: 'No offer, 4 qtrs', color: 'var(--s-red)', values: pick('unofferedShare'), kind: 'line', format: fmt.pct },
+          { name: 'Not on a slate, 4 qtrs', color: 'var(--s-gray)', values: pick('unseenShare'), kind: 'line', format: fmt.pct }],
+      }));
   }
   function emptyChart() { return '<p class="muted" style="padding:28px 0;text-align:center">Run a quarter to see flows.</p>'; }
 
@@ -374,6 +409,8 @@
       + '<div class="tt-row">Looking for work<b>' + fmt.int(r.pool) + '</b></div>'
       + '<div class="tt-row">Unemployment<b>' + fmt.pct(r.unemployment) + '</b></div>'
       + '<div class="tt-row">Avg commute<b>' + fmt.miles(r.avgCommute) + '</b></div>'
+      + (state.sim.q >= 1 ? '<div class="tt-row">Looking, no offer in 4 qtrs<b>' + fmt.int(r.unoffered) + '</b></div>'
+        + '<div class="tt-row">Looking, on no slate in 4 qtrs<b>' + fmt.int(r.unseen) + '</b></div>' : '')
       + '<div class="tt-muted" style="margin-top:4px">Click for residents</div>';
   }
 

@@ -2,6 +2,8 @@
 'use strict';
 const assert = require('assert');
 const W = require('../js/engine.js');
+const W0 = require('./fixtures/engine.original.js'); // the engine as originally provided
+const M = require('../js/metrics.js');
 const data = { cities: require('../js/data/cities.js'), companies: require('../js/data/companies.js') };
 const S = W.STATUS;
 
@@ -220,6 +222,59 @@ test('an agent history reads back in order', () => {
   const h = sim.history(a);
   assert(h.length >= 1);
   for (let i = 1; i < h.length; i++) assert(h[i].q >= h[i - 1].q, 'history out of order');
+});
+
+// ---------------------------------------------------------------- uplift features
+
+// Every series field the original engine produced must match exactly.
+function sameAsOriginal(over, label) {
+  const a = new W0.WorkforceSim(over, data).runToEnd();
+  const b = new W.WorkforceSim(over, data).runToEnd();
+  assert.strictEqual(a.series.length, b.series.length);
+  a.series.forEach((x, i) => Object.keys(x).forEach((k) => {
+    assert.deepStrictEqual(b.series[i][k], x[k], `${label}: ${k} differs in ${x.label}`);
+  }));
+  assert.strictEqual(a.events.n, b.events.n, `${label}: event count`);
+}
+
+test('all uplift features off: identical to the original engine (seeds 42, 7, 123)', () => {
+  [42, 7, 123].forEach((seed) => sameAsOriginal({ companies: 100, years: 3, seed }, 'seed ' + seed));
+  sameAsOriginal({ companies: 40, years: 2, seed: 5, exitAfterQuarters: 3, layoffTargeting: 1, capIncludesBackfills: 0 }, 'options');
+});
+
+const smallMean = (over, get) => {
+  const xs = [42, 7, 123].map((seed) => get(M.personaMetrics(make(Object.assign({ companies: 100, seed }, over)).runToEnd(), W)));
+  return xs.reduce((a, b) => a + b, 0) / xs.length;
+};
+
+test('Fair-Chance: books, band and cap hold every quarter', () => {
+  const sim = make({ fairScreening: 1, fairRotation: 1, growthLargePct: 30 });
+  const A = sim.agents;
+  while (!sim.done) {
+    sim.step();
+    checkBooks(sim);
+    for (let a = 0; a < A.n; a++) {
+      if (A.status[a] === S.EMPLOYED && A.joinedQ[a] === sim.q - 1 && A.level[a] === 0) assert(A.comp[a] <= A.band[a] + 1e-3, `agent ${a} above band`);
+    }
+    sim.companies.forEach((c) => assert(c.qc.hires <= c.capQ, `${c.name} over cap`));
+  }
+});
+
+test('Fair-Chance: new-grad placement within 4 quarters is not worse on average', () => {
+  const base = smallMean({}, (m) => m.cohorts.grad.placed4qShare);
+  const fair = smallMean({ fairScreening: 1 }, (m) => m.cohorts.grad.placed4qShare);
+  assert(fair >= base, `grads placed ≤4Q: ${fair.toFixed(3)} vs baseline ${base.toFixed(3)}`);
+});
+
+test('visibility: per-spell counts and shares stay in range', () => {
+  const sim = make({ years: 1 }).runToEnd();
+  const A = sim.agents, v = sim.visibility();
+  assert.strictEqual(v.total.n, sim.pool.length);
+  [v.total].concat(v.buckets, v.status, v.regions).forEach((g) => {
+    assert(g.unseenShare >= 0 && g.unseenShare <= 1 && g.unofferedShare >= 0 && g.unofferedShare <= 1, g.label);
+  });
+  assert(v.gini >= 0 && v.gini < 1 && v.offerGini >= 0 && v.offerGini < 1);
+  sim.pool.forEach((a) => assert(A.screenedSpell[a] <= A.screened[a] || A.screened[a] === 65535));
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);
