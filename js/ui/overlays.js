@@ -314,7 +314,7 @@
     this.show(function () {
       var r = sim.agentRecord(a);
       var hist = sim.history(a);
-      var EVC = ['var(--ink-2)', 'var(--s-blue)', 'var(--s-violet)', 'var(--s-red)', 'var(--s-gray)', 'var(--s-aqua)', 'var(--s-yellow)', 'var(--muted)'];
+      var EVC = ['var(--ink-2)', 'var(--s-blue)', 'var(--s-violet)', 'var(--s-red)', 'var(--s-gray)', 'var(--s-aqua)', 'var(--s-yellow)', 'var(--muted)', 'var(--s-aqua)', 'var(--s-orange)'];
       var tl = hist.map(function (h) {
         var where = h.companyName ? ' · ' + esc(h.companyName) : '';
         var val = h.type === W.EV.GRAD ? 'asking ' + fmt.money(h.value) : h.value ? fmt.money(h.value) : '';

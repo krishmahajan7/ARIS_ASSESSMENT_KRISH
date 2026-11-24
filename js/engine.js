@@ -78,6 +78,10 @@
     fairRotationPct: 20,     // share of the slate reserved when fairRotation is on
     fairRankDistance: 0,     // 1 = the fit rank also includes the commute term of P(accept) (widens regional gaps)
     fairIdleBoostPct: 30,    // fit-rank boost for idle time: up to +this% at 8+ idle quarters
+    warmHandoff: 0,          // 1 = laid-off people are offered open seats at nearby companies the same quarter
+    handoffCountsTowardCap: 1, // 1 = handoff hires use the receiving company's hiring cap (the brief's rule)
+    handoffRadiusMiles: 25,  // receiving HQ within this many miles of the old HQ
+    handoffSharePct: 100,    // share of each company's laid-off people offered the handoff
     // Stress tests (Policy Lab). The multipliers are ASSUMPTIONS, not estimates.
     shock: 0,                // 0 none · 1 recession (layoffs ×2, growth frozen) · 2 boom (growth ×2, cap ×1.5)
     shockStartQ: 4,          // first shocked quarter (0-based)
@@ -95,8 +99,8 @@
 
   var S = { EMPLOYED: 0, GRAD: 1, SWITCHER: 2, LAID_OFF: 3, RETIRED: 4, EXITED: 5 };
   var STATUS_NAMES = ['Employed', 'New grad (pool)', 'Switching jobs (pool)', 'Laid off (pool)', 'Retired', 'Left Bay Area'];
-  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7 };
-  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area'];
+  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7, REDEPLOY: 8 };
+  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area', 'Redeployed (warm handoff)'];
 
   var FIRST = ['Aarav', 'Maya', 'Wei', 'Sofia', 'Diego', 'Priya', 'Ethan', 'Mei', 'Omar', 'Hana', 'Lucas', 'Ananya',
     'Noah', 'Yuki', 'Mateo', 'Leila', 'Jin', 'Grace', 'Ravi', 'Chloe', 'Kofi', 'Isabel', 'Arjun', 'Nadia', 'Samuel',
@@ -187,6 +191,10 @@
     cfg.fairRotationPct = Math.max(0, Math.min(50, cfg.fairRotationPct));
     cfg.fairRankDistance = cfg.fairRankDistance ? 1 : 0;
     cfg.fairIdleBoostPct = Math.max(0, Math.min(200, cfg.fairIdleBoostPct));
+    cfg.warmHandoff = cfg.warmHandoff ? 1 : 0;
+    cfg.handoffCountsTowardCap = cfg.handoffCountsTowardCap ? 1 : 0;
+    cfg.handoffRadiusMiles = Math.max(1, cfg.handoffRadiusMiles);
+    cfg.handoffSharePct = Math.max(0, Math.min(100, cfg.handoffSharePct));
     cfg.shock = Math.max(0, Math.min(2, Math.round(cfg.shock)));
     cfg.shockStartQ = Math.max(0, Math.round(cfg.shockStartQ));
     cfg.shockQuarters = Math.max(1, Math.round(cfg.shockQuarters));
@@ -460,6 +468,7 @@
       hires: 0, leavers: 0, layoffs: 0, retired: 0, grads: 0, promos: 0, exits: 0,
       hireSpend: 0, hireComp: 0, hireCommute: 0, fillAge: 0,
       bySource: [0, 0, 0, 0], pairs: {},
+      handoffs: 0, handoffPairs: {}, laidOffSameQ: 0,
     };
     this.companies.forEach(function (c) {
       c.qc = { hires: 0, leavers: 0, layoffs: 0, retired: 0, promos: 0, hireSpend: 0 };
@@ -498,6 +507,12 @@
 
     // 6. Growth plan → reqs.
     this.companies.forEach(function (c) { self.plan(c); });
+
+    // 6b. Warm Handoff (opt-in): this quarter's laid-off people get first look
+    // at open seats nearby, before the general hiring round.
+    this.capsReady = false;
+    if (cfg.warmHandoff && this.handoffList && this.handoffList.length) this.handoff();
+    this.handoffList = null;
 
     // 7. Hiring.
     this.hire();
@@ -616,6 +631,12 @@
       });
       c.qc.layoffs += victims.length;
       self.flow.layoffs += victims.length;
+      if (cfg.warmHandoff) {
+        // The first share of the (already random or targeted) victim list; no extra random draws.
+        var offered = Math.round(victims.length * cfg.handoffSharePct / 100);
+        self.handoffList = self.handoffList || [];
+        for (var h = 0; h < offered; h++) self.handoffList.push(victims[h], c.idx);
+      }
       // Laid-off seats are eliminated: funded headcount is what's left plus open backfills.
       c.reqs = c.reqs.filter(function (r) { return r.kind === 0; });
       c.target = c.members.length + c.reqs.length;
@@ -671,10 +692,13 @@
     var cfg = this.cfg;
     var queue = [];
     var capPct = this.shockOn(2) ? cfg.hireCapPct * 1.5 : cfg.hireCapPct; // ASSUMPTION: a boom lifts the cap 1.5×
+    var preset = this.capsReady; // the handoff round already set this quarter's caps
     this.companies.forEach(function (c) {
-      c.capQ = Math.max(cfg.hireCapMin, Math.floor(capPct / 100 * c.members.length));
-      c.hiredQ = 0;
-      c.plannedQ = c.reqs.length;
+      if (!preset) {
+        c.capQ = Math.max(cfg.hireCapMin, Math.floor(capPct / 100 * c.members.length));
+        c.hiredQ = 0;
+        c.plannedQ = c.reqs.length;
+      }
       if (c.frozen) return;
       c.reqs.forEach(function (r) { queue.push(c, r); });
     });
@@ -698,6 +722,62 @@
       c.reqs = c.reqs.filter(function (r) { return !r.filled; });
       c.reqs.forEach(function (r) { r.age++; r.band *= esc; });
       c.capHit = c.hiredQ >= c.capQ && c.reqs.some(function (r) { return cfg.capIncludesBackfills || r.kind === 1; });
+    });
+  };
+
+  // Warm Handoff: each laid-off person (in layoff order) is offered the best
+  // open seat at other companies whose HQ is within handoffRadiusMiles of the
+  // old HQ, at their own level or one up. Best fit = highest P(accept) under
+  // the unchanged formula; up to 3 offers, one random draw each. Caps are
+  // fixed here (before anyone joins) exactly as hire() would fix them.
+  P.handoff = function () {
+    var cfg = this.cfg, A = this.agents;
+    var capPct = this.shockOn(2) ? cfg.hireCapPct * 1.5 : cfg.hireCapPct;
+    this.companies.forEach(function (c) {
+      c.capQ = Math.max(cfg.hireCapMin, Math.floor(capPct / 100 * c.members.length));
+      c.hiredQ = 0;
+      c.plannedQ = c.reqs.length;
+      // Open seats by level, best-paid first.
+      c._open = [[], [], [], [], [], [], []];
+      c.reqs.forEach(function (r) { c._open[r.level].push(r); });
+      c._open.forEach(function (l) { l.sort(function (x, y) { return y.band - x.band; }); });
+    });
+    this.capsReady = true;
+    var base = cfg.baseAcceptPct / 100, list = this.handoffList;
+    for (var i = 0; i < list.length; i += 2) {
+      var a = list[i], from = this.companies[list[i + 1]];
+      if (A.status[a] !== S.LAID_OFF || A.poolPos[a] < 0) continue;
+      var cands = [];
+      for (var k = 0; k < this.companies.length; k++) {
+        var c = this.companies[k];
+        if (c === from || c.frozen || this.dist[from.city][c.city] > cfg.handoffRadiusMiles) continue;
+        if (c.kind === 'startup' && c.members.length >= cfg.startupMax) continue;
+        if (cfg.handoffCountsTowardCap && c.hiredQ >= c.capQ) continue;
+        for (var lv = A.level[a]; lv <= Math.min(A.level[a] + 1, 6); lv++) {
+          var open = c._open[lv];
+          while (open.length && open[0].filled) open.shift();
+          if (!open.length || !this.eligible(a, lv)) continue;
+          var r = open[0], ask = A.expect[a], offer = Math.min(r.band, ask), miles = this.dist[A.city[a]][c.city];
+          cands.push({ c: c, r: r, offer: offer, miles: miles, p: base * Math.pow(offer / ask, cfg.compElasticity) * Math.pow(2, -miles / cfg.nearbyMiles) });
+        }
+      }
+      cands.sort(function (x, y) { return y.p - x.p || x.c.idx - y.c.idx; });
+      for (var t = 0; t < Math.min(3, cands.length); t++) {
+        var o = cands[t];
+        if (this.rand() < o.p) {
+          this.onboard(a, o.c, o.r, o.offer, o.miles, EV.REDEPLOY);
+          o.r.filled = true;
+          if (cfg.handoffCountsTowardCap) o.c.hiredQ++;
+          this.flow.handoffs++;
+          var key = from.idx + ':' + o.c.idx;
+          this.flow.handoffPairs[key] = (this.flow.handoffPairs[key] || 0) + 1;
+          break;
+        }
+      }
+    }
+    this.companies.forEach(function (c) {
+      c.reqs = c.reqs.filter(function (r) { return !r.filled; });
+      c._open = null;
     });
   };
 
@@ -781,9 +861,10 @@
     for (var j = 0; j < n; j++) slate[j] = sorted[j];
   };
 
-  P.onboard = function (a, c, r, offer, miles) {
+  P.onboard = function (a, c, r, offer, miles, eventType) {
     var A = this.agents, flow = this.flow;
     var source = A.status[a];
+    if (source === S.LAID_OFF && A.idleQ[a] === 0) flow.laidOffSameQ++; // laid off and re-employed in the same quarter
     this.leavePool(a);
     this.joinCompany(a, c, r.level);
     A.comp[a] = offer;
@@ -802,7 +883,7 @@
     flow.bySource[source]++;
     var key = A.city[a] + ':' + c.city;
     flow.pairs[key] = (flow.pairs[key] || 0) + 1;
-    this.events.push(a, this.q, EV.HIRE, c.idx, offer);
+    this.events.push(a, this.q, eventType || EV.HIRE, c.idx, offer);
   };
 
   P.agePool = function () {
@@ -881,6 +962,11 @@
       unseenShare: this.pool.length ? unseen / this.pool.length : 0,
       unofferedShare: this.pool.length ? unoffered / this.pool.length : 0,
       retiredTotal: retired, exitedTotal: exited,
+      handoffs: f.handoffs || 0, laidOffSameQ: f.laidOffSameQ || 0,
+      handoffPairs: Object.keys(f.handoffPairs || {}).map(function (k) {
+        var parts = k.split(':');
+        return [Number(parts[0]), Number(parts[1]), f.handoffPairs[k]];
+      }).sort(function (x, y) { return y[2] - x[2]; }).slice(0, 80),
       hires: f.hires, leavers: f.leavers, layoffs: f.layoffs, retired: f.retired, grads: f.grads, promos: f.promos, exits: f.exits,
       hiresGrad: f.bySource[S.GRAD], hiresSwitcher: f.bySource[S.SWITCHER], hiresLaidOff: f.bySource[S.LAID_OFF],
       openReqs: openReqs, backfillReqs: backfills, growthReqs: openReqs - backfills, oldReqs: oldReqs, capHitCompanies: capHit,

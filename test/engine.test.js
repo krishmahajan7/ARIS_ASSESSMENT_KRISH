@@ -298,4 +298,36 @@ test('metrics: one implementation for browser and tools; compare runs are determ
   sc.rows.forEach((r) => assert(r.score >= 0 && r.score <= 100, r.name));
 });
 
+test('Warm Handoff: books, band, cap and startup max hold; redeployed people never sit idle', () => {
+  const sim = make({ warmHandoff: 1, companies: 100 });
+  const A = sim.agents;
+  let handoffs = 0;
+  while (!sim.done) {
+    const evStart = sim.events.n;
+    sim.step();
+    checkBooks(sim);
+    handoffs += sim.series.at(-1).handoffs;
+    sim.companies.forEach((c) => {
+      assert(c.qc.hires <= c.capQ, `${c.name} hired ${c.qc.hires} over cap ${c.capQ}`);
+      if (c.kind === 'startup') assert(c.members.length <= 25, `${c.name} over startup max`);
+    });
+    for (let e = evStart; e < sim.events.n; e++) {
+      if (sim.events.type[e] !== W.EV.REDEPLOY) continue;
+      const a = sim.events.agent[e];
+      if (A.status[a] === S.EMPLOYED && A.joinedQ[a] === sim.q - 1) {
+        assert(A.level[a] > 0 || A.comp[a] <= A.band[a] + 1e-3, `redeployed agent ${a} above band`);
+        assert.strictEqual(A.idleQ[a], 0, 'redeployed with idle quarters');
+      }
+      assert(A.lastCompany[a] !== sim.events.company[e] || A.layoffs[a] > 0, 'redeployed into the company that laid them off');
+    }
+  }
+  assert(handoffs > 1000, `only ${handoffs} handoffs`);
+});
+
+test('Warm Handoff: cap-exempt lever hires more than the faithful reading', () => {
+  const a = make({ warmHandoff: 1 }).runToEnd(), b = make({ warmHandoff: 1, handoffCountsTowardCap: 0 }).runToEnd();
+  const sum = (sim) => sim.series.reduce((t, x) => t + x.hires, 0);
+  assert(sum(b) > sum(a), 'exempt handoffs should add hires');
+});
+
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

@@ -241,6 +241,15 @@
     var s = sim.series[sim.series.length - 1];
     var pairs = s.pairs.filter(function (p) { return p[0] !== p[1]; }).slice(0, 90);
     var maxN = pairs.length ? pairs[0][2] : 1;
+    // Warm handoffs this quarter: old HQ → new HQ.
+    var hand = s.handoffPairs || [], maxH = hand.length ? hand[0][2] : 1;
+    hand.forEach(function (p) {
+      var ca = sim.companies[p[0]], cb = sim.companies[p[1]];
+      var a = ca._xy || self.cityXY(ca.city), b = cb._xy || self.cityXY(cb.city);
+      var dx = b[0] - a[0], dy = b[1] - a[1], cx = (a[0] + b[0]) / 2 + dy * 0.25, cy = (a[1] + b[1]) / 2 - dx * 0.25;
+      el('path', { class: 'handoff', d: 'M' + a[0].toFixed(1) + ',' + a[1].toFixed(1) + 'Q' + cx.toFixed(1) + ',' + cy.toFixed(1) + ' ' + b[0].toFixed(1) + ',' + b[1].toFixed(1),
+        'stroke-width': (0.8 + 3 * Math.sqrt(p[2] / maxH)).toFixed(2), 'stroke-opacity': (0.35 + 0.5 * p[2] / maxH).toFixed(2) }, self.gFlows);
+    });
     pairs.forEach(function (p) {
       var a = self.cityXY(p[0]), b = self.cityXY(p[1]);
       var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
@@ -407,6 +416,7 @@
       + '<div class="row"><div class="ramp" style="background:linear-gradient(90deg,' + s0 + ',' + s1 + ')"></div></div>'
       + '<div class="ends"><span>0% unemployed</span><span>25%+</span></div>'
       + '<div class="row"><svg width="28" height="10" aria-hidden="true"><path d="M2 8 Q14 0 26 8" fill="none" stroke="var(--s-blue)" stroke-width="2" stroke-dasharray="3 3"/></svg><span>this quarter’s hires, home → HQ</span></div>'
+      + (this.sim && this.sim.cfg.warmHandoff ? '<div class="row"><svg width="28" height="10" aria-hidden="true"><path d="M2 8 Q14 0 26 8" fill="none" stroke="var(--s-aqua)" stroke-width="2.2"/></svg><span>warm handoffs, old HQ → new HQ</span></div>' : '')
       + '<div class="row"><svg width="28" height="10" aria-hidden="true"><circle cx="6" cy="5" r="2.5" fill="var(--s-aqua)"/><circle cx="14" cy="6" r="2.5" fill="var(--s-aqua)"/><circle cx="21" cy="3" r="2.5" fill="var(--s-aqua)"/></svg><span>startups</span></div>';
   };
 

@@ -280,6 +280,7 @@ input:disabled, select:disabled { cursor: not-allowed; opacity: 0.5; }
 #map .hq-label { fill: var(--ink); font-weight: 650; pointer-events: none; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round; }
 #map .flow { fill: none; stroke: var(--s-blue); stroke-linecap: round; stroke-dasharray: 3 5; animation: flow 1.2s linear infinite; vector-effect: non-scaling-stroke; pointer-events: none; }
 #map .shed { fill: none; stroke: var(--s-orange); stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+#map .handoff { fill: none; stroke: var(--s-aqua); stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
 @keyframes flow { to { stroke-dashoffset: -16; } }
 @media (prefers-reduced-motion: reduce) { #map .flow { animation: none; } }
 

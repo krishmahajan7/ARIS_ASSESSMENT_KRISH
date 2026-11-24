@@ -55,6 +55,11 @@
       { key: 'fairRankDistance', label: 'Fit rank also weighs commute', toggle: true, hint: 'Off by default: ranking on commute too widened the city unemployment gap by about 9–13 points.' },
       { key: 'fairRotation', label: 'Reserve slate seats for the longest-idle', toggle: true, hint: 'Measured: long-idle people are already screened, so this did not help on its own. Kept for comparison.' },
       { key: 'fairRotationPct', label: 'Reserved share of each slate', unit: '%', min: 0, max: 50, step: 5 },
+      { key: 'warmHandoff', label: 'Warm Handoff: redeploy laid-off people', toggle: true,
+        hint: 'The quarter of a layoff, each laid-off person gets first look at open seats at nearby companies, before general hiring. Same offer rule and acceptance formula.' },
+      { key: 'handoffCountsTowardCap', label: 'Handoff hires count toward the cap', toggle: true, hint: 'On = the brief’s 5% rule (jobs move between groups). Off = a policy lever that lets redeployment bypass the cap.' },
+      { key: 'handoffRadiusMiles', label: 'Handoff radius, HQ to HQ', unit: 'mi', min: 5, max: 60, step: 5 },
+      { key: 'handoffSharePct', label: 'Laid-off people offered a handoff', unit: '%', min: 0, max: 100, step: 10 },
     ] },
   ];
   var SPEEDS = [0.5, 1, 2, 4, 8];
@@ -174,6 +179,7 @@
     state.cityRows = state.sim.cityStats();
     map.setSim(state.sim);
     map.update(state.cityRows);
+    renderLegend();
     $('company-list').innerHTML = state.sim.companies.filter(function (c) { return c.kind === 'large'; })
       .map(function (c) { return '<option value="' + Charts.attr(c.name) + '"></option>'; }).join('');
     setStatus('ready');
@@ -258,7 +264,16 @@
         '<span>' + (last.openReqs ? fmt.pct(last.oldReqs / last.openReqs, 0) : '0%') + ' open 2+ qtrs · ' + last.capHitCompanies + ' at cap</span>')
       + kpi('Pay vs position band', fmt.signedPct(gap), '<span>' + fmt.money(last.avgComp) + ' avg · band ' + fmt.money(last.avgBand) + '</span>')
       + kpi('Hiring spend', fmt.money(last.hireSpend), '<span>this quarter · ' + fmt.money(total) + ' to date</span>')
-      + kpi('Avg commute', fmt.miles(last.avgCommute), '<span>new hires ' + (last.hireCommute != null ? fmt.miles(last.hireCommute) : '—') + ' · start ' + fmt.miles(first.avgCommute) + '</span>');
+      + kpi('Avg commute', fmt.miles(last.avgCommute), '<span>new hires ' + (last.hireCommute != null ? fmt.miles(last.hireCommute) : '—') + ' · start ' + fmt.miles(first.avgCommute) + '</span>')
+      + reemployedKpi(s);
+  }
+
+  // Laid off and hired again in the same quarter (any route), since the start.
+  function reemployedKpi(s) {
+    var laid = 0, same = 0, hand = 0;
+    s.forEach(function (x) { laid += x.layoffs; same += x.laidOffSameQ || 0; hand += x.handoffs || 0; });
+    return kpi('Re-employed same quarter', laid ? fmt.pct(same / laid) : '—',
+      '<span>of ' + fmt.k(laid) + ' laid off · ' + (state.cfg.warmHandoff ? fmt.k(hand) + ' via warm handoff' : 'warm handoff off') + '</span>');
   }
 
   var CHART_TABS = [['market', 'Jobs & people'], ['flows', 'Flows'], ['pay', 'Pay & commute'], ['vis', 'Visibility']];
@@ -295,13 +310,13 @@
           { name: 'Retired', color: 'var(--s-gray)', values: fpick('retired'), sign: -1 },
         ],
       }) : emptyChart())
-        + block('Who got hired', 'Hires by where they came from.', s.length > 1 ? Charts.barChart({
+        + block('Who got hired', 'Hires by where they came from.' + (state.cfg.warmHandoff ? ' Redeployed = laid off and placed by the warm handoff in the same quarter.' : ''), s.length > 1 ? Charts.barChart({
           labels: flowLabels, label: 'Hires by source',
           series: [
             { name: 'Switchers', color: 'var(--s-violet)', values: fpick('hiresSwitcher') },
-            { name: 'Laid off', color: 'var(--s-red)', values: fpick('hiresLaidOff') },
+            { name: 'Laid off', color: 'var(--s-red)', values: fpick('hiresLaidOff').map(function (v, i) { return v - (s[i + 1].handoffs || 0); }) },
             { name: 'New grads', color: 'var(--s-yellow)', values: fpick('hiresGrad') },
-          ],
+          ].concat(state.cfg.warmHandoff ? [{ name: 'Redeployed', color: 'var(--s-aqua)', values: fpick('handoffs') }] : []),
         }) : emptyChart());
     } else if (state.chartTab === 'vis') {
       html = visibilityPanel(s, labels, pick, block);
