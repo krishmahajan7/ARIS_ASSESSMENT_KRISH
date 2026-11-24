@@ -66,6 +66,17 @@
       { key: 'mentorAttritionCut', label: 'Grad quit-rate cut where a mentor works', unit: '% (assumption)', min: 0, max: 60, step: 5,
         hint: 'ASSUMPTION, not evidence. Measured: almost all of the grad-retention gain comes from this number; the headcount and unemployment gains come from mentors keeping their seats (they also appear at 0%).' },
     ] },
+    { group: 'Scenarios', note: 'What-if scenarios requested in the brief, not improvements. Deterministic (no random draws). Off = the original model.', items: [
+      { key: 'outsourceOn', label: 'Outsourcing to India', toggle: true,
+        hint: 'A US req left unfilled too long is closed (the seat is eliminated) and replaced by India hires. India hires are outside the US pool, cap and unemployment.' },
+      { key: 'outsourceAfterQ', label: 'Outsource after unfilled for more than', unit: 'qtrs', min: 0, max: 8, step: 1 },
+      { key: 'outsourceRatio', label: 'India hires per US role', unit: '× (assumption)', min: 1, max: 5, step: 0.5, decimals: 1,
+        hint: 'ASSUMPTION from the brief’s budget statement (2.5 per role). India pay is not modelled, so no cost claims.' },
+      { key: 'outsourceSharePct', label: 'Eligible reqs outsourced', unit: '% (every Nth)', min: 0, max: 100, step: 10 },
+      { key: 'aiSharePct', label: 'AI automation: share of new roles', unit: '% (0 = off)', min: 0, max: 100, step: 5,
+        hint: 'Going forward, this share of newly opened US roles (growth and backfills) is done by AI and closed instead of hired; the rest stay open for people. 70% is the scenario target. A scenario assumption, not a prediction. Existing employees are not laid off.' },
+      { key: 'aiRampQuarters', label: 'AI share ramps up over', unit: 'qtrs (assumption)', min: 1, max: 20, step: 1 },
+    ] },
   ];
   var SPEEDS = [0.5, 1, 2, 4, 8];
   // Presets only touch the uplift features; the brief's rules stay as set.
@@ -77,6 +88,8 @@
     ['handoffLever', 'Handoff, cap-exempt', { warmHandoff: 1, handoffCountsTowardCap: 0 }, 'Policy lever: redeployment bypasses the 5% cap.'],
     ['corridors', 'Bay Corridors', { corridors: 'suggest' }, 'Three suggested shuttle corridors.'],
     ['mentor', 'Retire-to-Mentor', { mentorSharePct: 50 }, 'Half of retirees phase out as mentors for 4 quarters.'],
+    ['outsourcing', 'Outsourcing', { outsourceOn: 1 }, 'Scenario: long-unfilled US reqs move to India (2.5 hires per role, an assumption).'],
+    ['ai', 'AI 70/30', { aiSharePct: 70 }, 'Scenario: 70% of newly opened US roles go to AI, ramping up over 8 quarters (an assumption).'],
   ];
   var LAYERS = [['hqs', 'Company HQs', 'var(--s-blue)'], ['startups', 'Startups', 'var(--s-aqua)'], ['residents', 'Where engineers live', 'var(--s-orange)'], ['flows', 'Hiring flows', 'var(--s-blue)']];
 
@@ -87,7 +100,7 @@
     corridors: [], // Bay Corridors: [{ from, to, cutPct, spillMiles }], outside the numeric settings
     preset: 'original', drawing: false, drawFrom: null,
   };
-  var UPLIFT_KEYS = [];
+  var UPLIFT_KEYS = [], SCENARIO_KEYS = [];
   var inputs = {};
 
   // ---------------------------------------------------------------- controls
@@ -126,6 +139,7 @@
         }
         inputs[c.key] = { def: c };
         if (g.group === 'Uplift features') UPLIFT_KEYS.push(c.key);
+        if (g.group === 'Scenarios') SCENARIO_KEYS.push(c.key);
       });
       html += '</details>';
     });
@@ -174,7 +188,7 @@
 
   function setConfig(key, raw) {
     if (locked()) return;
-    if (UPLIFT_KEYS.indexOf(key) >= 0 && state.preset) { state.preset = null; renderPresets(); }
+    if ((UPLIFT_KEYS.indexOf(key) >= 0 || SCENARIO_KEYS.indexOf(key) >= 0) && state.preset) { state.preset = null; renderPresets(); }
     state.cfg[key] = clamp(inputs[key].def, raw);
     syncControls();
     clearTimeout(setConfig.t);
@@ -288,7 +302,8 @@
       + kpi('Hiring spend', fmt.money(last.hireSpend), '<span>this quarter · ' + fmt.money(total) + ' to date</span>')
       + kpi('Avg commute', fmt.miles(last.avgCommute), '<span>new hires ' + (last.hireCommute != null ? fmt.miles(last.hireCommute) : '—') + ' · start ' + fmt.miles(first.avgCommute) + '</span>')
       + reemployedKpi(s)
-      + mentorKpi(s, last);
+      + mentorKpi(s, last)
+      + scenarioKpis(s, last);
   }
 
   // Laid off and hired again in the same quarter (any route), since the start.
@@ -297,6 +312,16 @@
     s.forEach(function (x) { laid += x.layoffs; same += x.laidOffSameQ || 0; hand += x.handoffs || 0; });
     return kpi('Re-employed same quarter', laid ? fmt.pct(same / laid) : '—',
       '<span>of ' + fmt.k(laid) + ' laid off · ' + (state.cfg.warmHandoff ? fmt.k(hand) + ' via warm handoff' : 'warm handoff off') + '</span>');
+  }
+
+  // Scenarios: roles that left the US hiring plan.
+  function scenarioKpis(s, last) {
+    var out = 0, ai = 0, cand = 0;
+    s.forEach(function (x) { out += x.outsourced || 0; ai += x.aiFilled || 0; cand += x.aiCandidates || 0; });
+    return kpi('Roles outsourced to India', state.cfg.outsourceOn ? fmt.int(out) : '—',
+      '<span>' + (state.cfg.outsourceOn ? fmt.int(last.indiaHeadcount || 0) + ' India hires (assumed ' + state.cfg.outsourceRatio + ' per role)' : 'scenario off') + '</span>')
+      + kpi('Roles automated by AI', state.cfg.aiSharePct ? fmt.int(ai) : '—',
+        '<span>' + (state.cfg.aiSharePct ? (cand ? fmt.pct(ai / cand, 0) : '0%') + ' of new roles so far · target ' + state.cfg.aiSharePct + '%' : 'scenario off') + '</span>');
   }
 
   // Retire-to-Mentor: mentors now, and how recently hired grads stay.
@@ -576,8 +601,9 @@
   // The uplift settings that differ from the original model, for labels.
   function upliftSettings() {
     var out = {};
-    UPLIFT_KEYS.forEach(function (k) {
-      var on = { fairIdleBoostPct: 'fairScreening', fairRankDistance: 'fairScreening', fairRotationPct: 'fairRotation' }[k];
+    UPLIFT_KEYS.concat(SCENARIO_KEYS).forEach(function (k) {
+      var on = { fairIdleBoostPct: 'fairScreening', fairRankDistance: 'fairScreening', fairRotationPct: 'fairRotation',
+        outsourceAfterQ: 'outsourceOn', outsourceRatio: 'outsourceOn', outsourceSharePct: 'outsourceOn', aiRampQuarters: 'aiSharePct' }[k];
       if (on && !state.cfg[on]) return; // a knob of a feature that is off doesn't change anything
       if (state.cfg[k] !== W.DEFAULTS[k] || (!on && state.cfg[k])) out[k] = state.cfg[k];
     });
@@ -589,7 +615,7 @@
   function applyPolicy(patch) {
     if (locked()) stop();
     overlays.close();
-    UPLIFT_KEYS.forEach(function (k) { state.cfg[k] = W.DEFAULTS[k]; });
+    UPLIFT_KEYS.concat(SCENARIO_KEYS).forEach(function (k) { state.cfg[k] = W.DEFAULTS[k]; });
     state.corridors = [];
     Object.keys(patch).forEach(function (k) {
       if (k === 'corridors') {

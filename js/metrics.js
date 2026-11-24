@@ -163,6 +163,11 @@
       gradFirstYearQuitUnmentored: sumKey(s, 'gradHiresUnmentored') ? sumKey(s, 'gradEarlyQuitsUnmentored') / sumKey(s, 'gradHiresUnmentored') : null,
       gradHiresMentored: sumKey(s, 'gradHiresMentored'),
       backfillReqs: last.backfillReqs,
+      // Scenarios (outsourcing, AI): roles that left the US hiring plan.
+      indiaHeadcount: last.indiaHeadcount || 0,
+      outsourcedRoles: sumKey(s, 'outsourced'),
+      aiFilledRoles: sumKey(s, 'aiFilled'),
+      aiShareOfNewRoles: sumKey(s, 'aiCandidates') ? sumKey(s, 'aiFilled') / sumKey(s, 'aiCandidates') : 0,
       unfilledReqs: last.openReqs,
       oldReqs: last.oldReqs,
       avgFillQuarters: hires ? fillAgeSum / hires : null,
@@ -205,6 +210,9 @@
     ['gradQuit', 'Grad hires: first-year quit rate', function (m) { return m.gradFirstYearQuit; }, 'pct', false],
     ['backfill', 'Open backfill reqs at end', function (m) { return m.backfillReqs; }, 'num', false],
     ['hires', 'Total hires', function (m) { return m.hires; }, 'num', true],
+    ['india', 'India headcount (outsourced roles)', function (m) { return m.indiaHeadcount; }, 'num', null],
+    ['outsourced', 'US roles outsourced', function (m) { return m.outsourcedRoles; }, 'num', null],
+    ['aiFilled', 'US roles automated by AI', function (m) { return m.aiFilledRoles; }, 'num', null],
   ];
 
   // ---------------------------------------------------------------- persona scorecard

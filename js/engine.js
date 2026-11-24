@@ -85,6 +85,13 @@
     mentorSharePct: 0,       // share of employed retirees who phase out as mentors first (0 = off)
     mentorQuarters: 4,       // how long a mentor stays before retiring for real
     mentorAttritionCut: 30,  // ASSUMPTION: cut in first-year quit rate for grads hired where a mentor works
+    // Scenarios requested in the brief (not uplift features). Deterministic: no random draws.
+    outsourceOn: 0,          // 1 = long-unfilled US reqs are closed and replaced by India hires
+    outsourceAfterQ: 1,      // a req unfilled for more than this many quarters may be outsourced
+    outsourceRatio: 2.5,     // ASSUMPTION (from the brief's budget statement): India hires per US role
+    outsourceSharePct: 100,  // share of eligible reqs outsourced (every Nth, not random)
+    aiSharePct: 0,           // ASSUMPTION (scenario target 70): share of newly opened US roles filled by AI
+    aiRampQuarters: 8,       // ASSUMPTION: the AI share ramps linearly from 0 over this many quarters
     // Stress tests (Policy Lab). The multipliers are ASSUMPTIONS, not estimates.
     shock: 0,                // 0 none · 1 recession (layoffs ×2, growth frozen) · 2 boom (growth ×2, cap ×1.5)
     shockStartQ: 4,          // first shocked quarter (0-based)
@@ -113,8 +120,8 @@
 
   var S = { EMPLOYED: 0, GRAD: 1, SWITCHER: 2, LAID_OFF: 3, RETIRED: 4, EXITED: 5 };
   var STATUS_NAMES = ['Employed', 'New grad (pool)', 'Switching jobs (pool)', 'Laid off (pool)', 'Retired', 'Left Bay Area'];
-  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7, REDEPLOY: 8, MENTOR: 9 };
-  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area', 'Redeployed (warm handoff)', 'Became a mentor (phased retirement)'];
+  var EV = { HIRE: 1, LEAVE: 2, LAYOFF: 3, RETIRE: 4, PROMOTE: 5, GRAD: 6, EXIT: 7, REDEPLOY: 8, MENTOR: 9, OUTSOURCE: 10, AUTOMATE: 11 };
+  var EVENT_NAMES = ['', 'Hired', 'Left voluntarily', 'Laid off', 'Retired', 'Promoted', 'Graduated', 'Left the Bay Area', 'Redeployed (warm handoff)', 'Became a mentor (phased retirement)', 'Role outsourced to India', 'Role automated'];
 
   var FIRST = ['Aarav', 'Maya', 'Wei', 'Sofia', 'Diego', 'Priya', 'Ethan', 'Mei', 'Omar', 'Hana', 'Lucas', 'Ananya',
     'Noah', 'Yuki', 'Mateo', 'Leila', 'Jin', 'Grace', 'Ravi', 'Chloe', 'Kofi', 'Isabel', 'Arjun', 'Nadia', 'Samuel',
@@ -212,6 +219,12 @@
     cfg.mentorSharePct = Math.max(0, Math.min(100, cfg.mentorSharePct));
     cfg.mentorQuarters = Math.max(1, Math.min(12, Math.round(cfg.mentorQuarters)));
     cfg.mentorAttritionCut = Math.max(0, Math.min(90, cfg.mentorAttritionCut));
+    cfg.outsourceOn = cfg.outsourceOn ? 1 : 0;
+    cfg.outsourceAfterQ = Math.max(0, Math.min(12, Math.round(cfg.outsourceAfterQ)));
+    cfg.outsourceRatio = Math.max(0, Math.min(10, cfg.outsourceRatio));
+    cfg.outsourceSharePct = Math.max(0, Math.min(100, cfg.outsourceSharePct));
+    cfg.aiSharePct = Math.max(0, Math.min(100, cfg.aiSharePct));
+    cfg.aiRampQuarters = Math.max(1, Math.min(40, Math.round(cfg.aiRampQuarters)));
     cfg.shock = Math.max(0, Math.min(2, Math.round(cfg.shock)));
     cfg.shockStartQ = Math.max(0, Math.round(cfg.shockStartQ));
     cfg.shockQuarters = Math.max(1, Math.round(cfg.shockQuarters));
@@ -283,7 +296,7 @@
     this.type[i] = type;
     this.company[i] = company;
     this.value[i] = value;
-    this.exp[i] = this.sim ? this.sim.agents.exp[agent] : 0; // years of experience at the event (for persona metrics)
+    this.exp[i] = this.sim && agent >= 0 ? this.sim.agents.exp[agent] : 0; // agent −1 = a role, not a person // years of experience at the event (for persona metrics)
   };
 
   // ------------------------------------------------------------------ simulation
@@ -316,6 +329,10 @@
     this.pool = [];
     this.active = [];
     this.mentors = []; // Retire-to-Mentor: agents phasing out
+    this.indiaHeadcount = 0; // Outsourcing scenario: India hires so far (not part of the US model)
+    this.outsourceTick = 0;  // every-Nth counter for outsourceSharePct
+    this.aiAcc = 0;          // AI scenario: running share accumulator (deterministic)
+    this.lastOutsourced = []; // this quarter's outsourced req objects (for tests)
     this.series = [];
 
     // Commute miles between every pair of cities.
@@ -519,6 +536,7 @@
       bySource: [0, 0, 0, 0], pairs: {},
       handoffs: 0, handoffPairs: {}, laidOffSameQ: 0,
       mentorsNew: 0, mentorRetired: 0, gradHires: [0, 0], gradEarlyQuits: [0, 0],
+      outsourced: 0, aiFilled: 0, aiCandidates: 0,
     };
     this.companies.forEach(function (c) {
       c.qc = { hires: 0, leavers: 0, layoffs: 0, retired: 0, promos: 0, hireSpend: 0 };
@@ -561,6 +579,9 @@
 
     // 6. Growth plan → reqs.
     this.companies.forEach(function (c) { self.plan(c); });
+
+    // 6a. Outsourcing scenario (opt-in): long-unfilled reqs close in the US.
+    if (cfg.outsourceOn) this.outsource();
 
     // 6b. Warm Handoff (opt-in): this quarter's laid-off people get first look
     // at open seats nearby, before the general hiring round.
@@ -687,6 +708,7 @@
         return;
       }
     }
+    if (this.cfg.aiSharePct && this.automate(c, level)) return;
     c.reqs.push({ level: level, band: band, age: 0, kind: 0 });
   };
 
@@ -768,8 +790,57 @@
     c.reqs.forEach(function (r) { open[r.level]++; });
     for (var level = 0; level < want.length; level++) {
       var gap = want[level] - c.levelCount[level] - open[level];
-      for (var k = 0; k < gap; k++) c.reqs.push({ level: level, band: this.levelBand(c, level), age: 0, kind: 1 });
+      for (var k = 0; k < gap; k++) {
+        if (cfg.aiSharePct && this.automate(c, level)) continue;
+        c.reqs.push({ level: level, band: this.levelBand(c, level), age: 0, kind: 1 });
+      }
     }
+  };
+
+  // AI scenario: of the roles opened from now on, a ramped share (aiSharePct,
+  // reached after aiRampQuarters) is done by AI instead of hired. The choice is
+  // a running accumulator, not a random draw. The seat leaves the human plan,
+  // so it is not reopened next quarter. Existing employees are not laid off.
+  P.automate = function (c, level) {
+    var cfg = this.cfg;
+    var share = cfg.aiSharePct / 100 * Math.min(1, (this.q + 1) / cfg.aiRampQuarters);
+    this.flow.aiCandidates++;
+    this.aiAcc += share;
+    if (this.aiAcc < 1) return false;
+    this.aiAcc -= 1;
+    c.target = Math.max(0, c.target - 1);
+    this.flow.aiFilled++;
+    this.events.push(-1, this.q, EV.AUTOMATE, c.idx, level);
+    return true;
+  };
+
+  // Outsourcing scenario: every Nth req unfilled for more than outsourceAfterQ
+  // quarters is closed (the seat is eliminated, like a laid-off seat) and
+  // replaced by outsourceRatio India hires, which sit outside the US model.
+  P.outsource = function () {
+    var cfg = this.cfg, self = this;
+    this.lastOutsourced = [];
+    this.companies.forEach(function (c) {
+      if (!c.reqs.length) return;
+      var keep = [];
+      c.reqs.forEach(function (r) {
+        if (r.age > cfg.outsourceAfterQ) {
+          var k = self.outsourceTick++;
+          if (Math.floor((k + 1) * cfg.outsourceSharePct / 100) > Math.floor(k * cfg.outsourceSharePct / 100)) {
+            r.outsourced = true;
+            self.lastOutsourced.push(r);
+            c.target = Math.max(0, c.target - 1);
+            c.india = (c.india || 0) + cfg.outsourceRatio;
+            self.indiaHeadcount += cfg.outsourceRatio;
+            self.flow.outsourced++;
+            self.events.push(-1, self.q, EV.OUTSOURCE, c.idx, r.level);
+            return;
+          }
+        }
+        keep.push(r);
+      });
+      c.reqs = keep;
+    });
   };
 
   P.eligible = function (a, level) {
@@ -1059,6 +1130,7 @@
       retiredTotal: retired, exitedTotal: exited,
       handoffs: f.handoffs || 0, laidOffSameQ: f.laidOffSameQ || 0,
       mentorsActive: this.mentors.length, mentorsNew: f.mentorsNew || 0, mentorRetired: f.mentorRetired || 0,
+      outsourced: f.outsourced || 0, indiaHeadcount: this.indiaHeadcount, aiFilled: f.aiFilled || 0, aiCandidates: f.aiCandidates || 0,
       gradHiresMentored: f.gradHires ? f.gradHires[1] : 0, gradHiresUnmentored: f.gradHires ? f.gradHires[0] : 0,
       gradEarlyQuitsMentored: f.gradEarlyQuits ? f.gradEarlyQuits[1] : 0, gradEarlyQuitsUnmentored: f.gradEarlyQuits ? f.gradEarlyQuits[0] : 0,
       handoffPairs: Object.keys(f.handoffPairs || {}).map(function (k) {

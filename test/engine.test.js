@@ -390,4 +390,44 @@ test('Retire-to-Mentor: with the attrition cut at 0, grad quits are unchanged wi
   assert(assumed < off - 0.02, 'the assumed cut lowers grad quits');
 });
 
+test('Scenarios: outsourcing and AI keep the books, caps and startup max; deterministic per seed', () => {
+  const cfg = { companies: 100, outsourceOn: 1, aiSharePct: 70 };
+  const sim = make(cfg), twin = make(cfg);
+  let outsourced = 0, ai = 0, cand = 0;
+  while (!sim.done) {
+    sim.step();
+    twin.step();
+    checkBooks(sim);
+    const s = sim.series.at(-1);
+    outsourced += s.outsourced; ai += s.aiFilled; cand += s.aiCandidates;
+    sim.lastOutsourced.forEach((r) => assert(!r.filled, 'a seat was both outsourced and filled'));
+    sim.companies.forEach((c) => {
+      assert(c.qc.hires <= c.capQ, `${c.name} over cap`);
+      if (c.kind === 'startup') assert(c.members.length <= 25, `${c.name} over startup max`);
+      c.reqs.forEach((r) => assert(!r.outsourced, 'an outsourced req is still open'));
+    });
+    // AI share: never above the target at any point.
+    assert(ai <= cand * 0.70 + 1, `AI took ${ai} of ${cand} roles`);
+  }
+  assert(outsourced > 100 && ai > 1000, `outsourced ${outsourced}, automated ${ai}`);
+  assert(Math.abs(sim.series.at(-1).indiaHeadcount - 2.5 * outsourced) < 1e-6, 'India hires = 2.5 × outsourced reqs');
+  assert.deepStrictEqual(sim.series.map((x) => x.employed), twin.series.map((x) => x.employed), 'same seed, same run');
+  let ev = 0;
+  for (let i = 0; i < sim.events.n; i++) if (sim.events.type[i] === W.EV.OUTSOURCE) ev++;
+  assert.strictEqual(ev, outsourced, 'one "Role outsourced" event per req');
+});
+
+test('Scenarios: the AI share ramps and never exceeds aiSharePct; outsourcing every Nth is exact', () => {
+  const sim = make({ companies: 100, aiSharePct: 40, aiRampQuarters: 4 }).runToEnd();
+  const s = sim.series;
+  s.slice(1).forEach((x, i) => {
+    const target = 0.4 * Math.min(1, (i + 1) / 4);
+    if (x.aiCandidates > 50) assert(x.aiFilled / x.aiCandidates <= target + 0.02, `quarter ${i}: ${x.aiFilled}/${x.aiCandidates} vs ${target}`);
+  });
+  const half = make({ companies: 100, outsourceOn: 1, outsourceSharePct: 50 }), full = make({ companies: 100, outsourceOn: 1 });
+  half.step(); full.step(); half.step(); full.step(); half.step(); full.step();
+  const tick = half.outsourceTick, taken = half.series.reduce((t, x) => t + x.outsourced, 0);
+  assert(Math.abs(taken - tick * 0.5) <= 1, `every 2nd eligible req: ${taken} of ${tick}`);
+});
+
 console.log(`\n${passed} passed${process.exitCode ? ', some FAILED' : ''}`);

@@ -9,4 +9,5 @@ node tools/compare.js '{}' '{"warmHandoff":1}' '{"warmHandoff":1,"handoffCountsT
 node tools/compare.js '{}' '{"corridors":"suggest"}' '{"corridors":"suggest","fairScreening":1}' > tools/results/f3-corridors.txt
 node tools/compare.js '{}' '{"mentorSharePct":50}' '{"mentorSharePct":50,"mentorAttritionCut":0}' > tools/results/f4-mentor.txt
 node tools/compare.js '{}' '{"fairScreening":1,"warmHandoff":1,"mentorSharePct":50,"corridors":"suggest"}' '{"fairScreening":1,"warmHandoff":1,"handoffCountsTowardCap":0,"mentorSharePct":50,"corridors":"suggest"}' > tools/results/all-uplift.txt
+node tools/compare.js '{}' '{"outsourceOn":1}' '{"aiSharePct":70}' '{"outsourceOn":1,"aiSharePct":70}' > tools/results/scenarios.txt
 echo done

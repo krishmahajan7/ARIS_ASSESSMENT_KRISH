@@ -12,7 +12,13 @@
   var DATA = { cities: root.BAY_CITIES, companies: root.BAY_COMPANIES };
 
   // What "Baseline" means: every uplift feature forced off (same seed and rules).
-  var OFF = { fairScreening: 0, fairRotation: 0, warmHandoff: 0, mentorSharePct: 0 };
+  var OFF = { fairScreening: 0, fairRotation: 0, warmHandoff: 0, mentorSharePct: 0, outsourceOn: 0, aiSharePct: 0 };
+  // Scenario rows shown under the persona table (not scored).
+  var EXTRA = [
+    ['US unemployment', function (m) { return m.unemployment; }, 'pct', false],
+    ['India headcount (outsourced roles)', function (m) { return m.indiaHeadcount; }, 'num', null],
+    ['US roles automated by AI', function (m) { return m.aiFilledRoles; }, 'num', null],
+  ];
   function offPatch() {
     var p = {};
     Object.keys(OFF).forEach(function (k) { if (k in W.DEFAULTS) p[k] = OFF[k]; });
@@ -222,7 +228,9 @@
       + '<p class="muted">' + esc(sim.label(sim.q)) + ' · ' + sim.q + ' of ' + sim.quarters + ' quarters · settings: ' + esc(describe(this.app.upliftSettings())) + '. '
       + (sim.q < 5 ? '<b>“Placed ≤4Q” needs 4 quarters of follow-up, so early numbers are thin.</b> ' : '')
       + 'Weights apply in every tab.</p></div>'
-      + '<div class="tbl-wrap"><table class="data lab-table"><thead><tr><th>Persona</th><th>Score (0–100)</th><th>What it measures, this run</th><th>Weight</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="tbl-wrap"><table class="data lab-table"><thead><tr><th>Persona</th><th>Score (0–100)</th><th>What it measures, this run</th><th>Weight</th></tr></thead><tbody>' + rows
+      + EXTRA.map(function (x) { return '<tr class="lab-extra"><td><b>' + esc(x[0]) + '</b></td><td class="muted">scenario row, not scored</td><td>' + fmtKind(x[1](m), x[2]) + '</td><td></td></tr>'; }).join('')
+      + '</tbody></table></div>'
       + '<p class="chart-sub" style="margin-top:8px">Scores are heuristic 0–100 scales of one or two metrics each (README, “Persona scorecard”), not a welfare measure. Compare policies on the same scale, not across scales. “Placed ≤4Q” = hired in the quarter they started looking or the 3 after it. <button class="link" type="button" data-lab-action="reset-weights">Reset weights</button></p>';
   };
 
@@ -282,7 +290,13 @@
       + '<div class="lab-gl"><div class="gain"><b>Who gains</b> ' + (gains.length ? esc(gains.join(' · ')) : '<span class="muted">nobody by 1+ point</span>') + '</div>'
       + '<div class="loss"><b>Who loses</b> ' + (losses.length ? esc(losses.join(' · ')) : '<span class="muted">nobody by 1+ point</span>') + '</div>'
       + '<div class="net"><b>Sum of persona changes</b> ' + delta(sum, true, (sum >= 0 ? '+' : '−') + Math.abs(sum).toFixed(1) + ' points') + ' <span class="muted">(unweighted; under the hiring cap, gains for one group are often paid by another)</span></div></div>'
-      + '<div class="tbl-wrap"><table class="data lab-table"><thead><tr><th>Persona</th><th>Baseline</th><th>Your policy</th><th class="r">Δ score</th><th>Your policy, in numbers</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="tbl-wrap"><table class="data lab-table"><thead><tr><th>Persona</th><th>Baseline</th><th>Your policy</th><th class="r">Δ score</th><th>Your policy, in numbers</th></tr></thead><tbody>' + rows
+      + EXTRA.map(function (x) {
+        var vb = x[1](res.base), vp = x[1](res.pol), d = vp - vb;
+        return '<tr class="lab-extra"><td><b>' + esc(x[0]) + '</b></td><td>' + fmtKind(vb, x[2]) + '</td><td>' + fmtKind(vp, x[2]) + '</td><td class="r">'
+          + (x[3] == null ? '<span class="delta flat">' + fmtDeltaKind(d, x[2]) + '</span>' : delta(Math.abs(d) > 1e-9 ? d : 0, x[3], fmtDeltaKind(d, x[2]))) + '</td><td class="muted">scenario row, not scored</td></tr>';
+      }).join('')
+      + '</tbody></table></div>'
       + '<details class="lab-details"><summary>All metrics</summary><div class="tbl-wrap"><table class="data"><thead><tr><th>Metric</th><th class="r">Baseline</th><th class="r">Your policy</th><th class="r">Δ</th></tr></thead><tbody>' + metricRows + '</tbody></table></div>'
       + '<p class="chart-sub">“NET placed ≤4Q” adds the three pool cohorts. If a policy only moves jobs between groups, NET stays flat while the group rows move in opposite directions.</p></details>';
   };
